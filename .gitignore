@@ -1,4 +1,4 @@
-# Данные пользователя — НИКОГДА не коммитить (БД, ключи, история)
+# User data — NEVER commit (database, keys, history)
 data/
 state/
 logs/
@@ -8,7 +8,7 @@ logs/
 *.key
 *.log
 
-# Сборка / окружение
+# Build / environment
 .venv/
 venv/
 build/
@@ -19,13 +19,13 @@ __pycache__/
 *.spec.bak
 *.bak_*
 
-# ОС / IDE
+# OS / IDE
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 
-# Чужая документация (BingX) — не распространяем (своя docs/strategies.*.md коммитится)
+# Third-party documentation (BingX) — do not redistribute (our own docs/strategies.*.md IS committed)
 docs/bingx/
 .venv-build/
 

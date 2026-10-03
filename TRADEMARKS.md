@@ -1,37 +1,37 @@
 # Trademarks & disclaimers — Rawanga Trading Desk
 
-## Торговые марки
+## Trademarks
 
-**Rawanga Trading Desk** — независимый проект Andrei Maltsev (Rawanga AI).
-Он **не связан, не аффилирован и не одобрен** следующими компаниями и их
-продуктами:
+**Rawanga Trading Desk** is an independent project by Andrei Maltsev (Rawanga AI).
+It is **not affiliated with, endorsed by, or sponsored by** the following
+companies or their products:
 
-- **TradingView, Inc.** — «TradingView», «Pine», «Pine Script» и логотипы
-  являются товарными знаками TradingView, Inc. Настоящее ПО не производится,
-  не одобрено и не спонсируется TradingView, Inc.
-- **BingX** — название и логотипы BingX принадлежат BingX. Партнёрская ссылка
-  в интерфейсе не означает одобрения или аффилированности.
-- Прочие упомянутые биржи (Binance, Bybit, OKX) и источники данных (Yahoo
-  Finance, CoinGecko) — их товарные знаки принадлежат их владельцам.
+- **TradingView, Inc.** — "TradingView", "Pine", "Pine Script" and the logos are
+  trademarks of TradingView, Inc. This software is not produced, endorsed or
+  sponsored by TradingView, Inc.
+- **BingX** — the BingX name and logos belong to BingX. The partner link shown in
+  the interface does not imply endorsement or affiliation.
+- Other mentioned exchanges (Binance, Bybit, OKX) and data sources (Yahoo
+  Finance, CoinGecko) — their trademarks belong to their respective owners.
 
-Использование сторонних товарных знаков носит исключительно описательный
-характер (совместимость/источник данных) и не подразумевает одобрения.
-Лицензия Apache-2.0, под которой распространяется ПО, **не даёт прав на
-использование товарных знаков** (см. Apache License 2.0, §6).
+Any use of third-party trademarks is purely descriptive (compatibility / data
+source) and does not imply endorsement. The Apache-2.0 license under which this
+software is distributed **grants no rights to use trademarks** (see Apache
+License 2.0, §6).
 
-## Отказ от гарантий и ответственности
+## Warranty & liability disclaimer
 
-ПО предоставляется «как есть», без каких-либо гарантий. Автор не несёт
-ответственности за любые прямые или косвенные убытки, включая торговые потери.
+The software is provided "as is", without any warranty. The author is not liable
+for any direct or indirect damages, including trading losses.
 
-## Не инвестиционная рекомендация
+## Not investment advice
 
-ПО является инструментом технического анализа и автоматизации. Оно **не
-предоставляет инвестиционных, финансовых или юридических консультаций**.
-Торговля криптоактивами и деривативами сопряжена с высоким риском полной
-потери средств. Все решения и риски — на стороне пользователя.
+This software is a technical-analysis and automation tool. It **does not provide
+investment, financial or legal advice**. Trading crypto assets and derivatives
+involves a high risk of total loss of funds. All decisions and risks are the
+user's own.
 
-## Данные
+## Data
 
-Котировки получаются из публичных интерфейсов указанных источников. Соблюдение
-их условий использования — ответственность конечного пользователя.
+Quotes are obtained from the public interfaces of the mentioned sources. Complying
+with their terms of use is the end user's responsibility.

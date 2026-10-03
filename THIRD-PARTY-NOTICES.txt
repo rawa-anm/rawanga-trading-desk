@@ -1,18 +1,18 @@
-Rawanga TV — Portable Edition
+Rawanga Trading Desk — Portable Edition
 THIRD-PARTY SOFTWARE NOTICES
 Copyright (c) 2026 Andrei Maltsev (Rawanga AI)
 
 ================================================================================
 1. TradingView Lightweight Charts(TM) v4.2.0
-   Файл: static/js/lightweight-charts.standalone.production.js
+   File: static/js/lightweight-charts.standalone.production.js
    Copyright (c) 2024 TradingView, Inc.
-   Лицензия: Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0
-   Предоставляется «как есть». Текст лицензии сохранён в заголовке файла.
-   Торговые марки и логотипы TradingView принадлежат TradingView, Inc. и не
-   используются для продвижения данного продукта.
+   License: Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0
+   Provided "as is". The license text is kept in the file header.
+   TradingView trademarks and logos belong to TradingView, Inc. and are not used
+   to promote this product.
 
 ================================================================================
-2. Сторонние Python-библиотеки (пермиссивные лицензии MIT/BSD/Apache/MPL):
+2. Third-party Python libraries (permissive licenses MIT/BSD/Apache/MPL):
    - aiosqlite 0.22.1: MIT License
    - annotated-doc 0.0.5: MIT
    - annotated-types 0.8.0: MIT
@@ -42,7 +42,7 @@ Copyright (c) 2026 Andrei Maltsev (Rawanga AI)
    - websocket-client 1.9.2: Apache-2.0
    - websockets 17.1: BSD-3-Clause
 
-Ни один из компонентов не является копилефт-лицензией (GPL/AGPL отсутствуют),
-что позволяет распространять ПО под проприетарной лицензией.
-Полные тексты лицензий — в метаданных пакетов; по требованию прилагаются в
-каталоге licenses/.
+None of these components is copyleft (no GPL/AGPL), which allows distributing
+this software under a permissive license.
+Full license texts are available in package metadata; on request they are also
+provided in the licenses/ directory.

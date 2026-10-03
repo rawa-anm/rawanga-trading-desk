@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Andrei Maltsev (Rawanga). All rights reserved.
-# Сборка портативных билдов Rawanga Trading Desk под все ОС на бесплатных раннерах GitHub.
+# Build portable Rawanga Trading Desk bundles for all OSes on free GitHub runners.
 name: build
 
 on:
@@ -20,7 +20,7 @@ jobs:
             artifact: RawangaTradingDesk-macos-x64
           - os: macos-14              # macOS Apple Silicon
             artifact: RawangaTradingDesk-macos-arm64
-          - os: ubuntu-latest         # Linux x64 (бонус)
+          - os: ubuntu-latest         # Linux x64 (bonus)
             artifact: RawangaTradingDesk-linux-x64
     runs-on: ${{ matrix.os }}
     steps:
@@ -68,5 +68,5 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
-          # Примечание: артефакты НЕ подписаны. macOS-пользователю: xattr -dr com.apple.quarantine;
-          # Windows: SmartScreen-предупреждение. Для чистой раздачи нужны сертификаты (см. README).
+          # Note: artifacts are NOT code-signed. macOS users: xattr -dr com.apple.quarantine;
+          # Windows: SmartScreen warning. Clean distribution requires certificates (see README).

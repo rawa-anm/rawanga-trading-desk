@@ -1,28 +1,31 @@
 # Rawanga Trading Desk
 
-Портативный кроссплатформенный терминал графиков, индикаторов и сигналов
-(десктоп-приложение для Windows / macOS / Linux). Локальный сервер на
-`127.0.0.1` + веб-интерфейс в браузере. Данные пользователя хранятся рядом с
-приложением (`data/`).
+Portable, cross-platform charting / indicator / signal terminal (desktop app for
+Windows / macOS / Linux). A local server on `127.0.0.1` plus a browser UI. Your
+data is stored next to the application (`data/`).
 
-- Сайт: https://rawanga.es
-- Партнёрская ссылка (BingX): https://bingx.com/partner/rawa/
+- Website: https://rawanga.es
+- Partner link (BingX): https://bingx.com/partner/rawa/
 
-## Документация
+> Intended use: **individual, single-user**. There is no authentication and no
+> multi-user separation — see the RTFM guide before hosting anywhere.
 
-- **Установка и работа (RTFM):** [English](docs/rtfm.en.md) · [Español](docs/rtfm.es.md) · [Русский](docs/rtfm.ru.md)
-- **Написание стратегий:** [English](docs/strategies.en.md) · [Español](docs/strategies.es.md) · [Русский](docs/strategies.ru.md)
+## Documentation
 
-## Возможности
+- **Installation & usage (RTFM):** [English](docs/rtfm.en.md) · [Español](docs/rtfm.es.md) · [Русский](docs/rtfm.ru.md)
+- **Writing strategies:** [English](docs/strategies.en.md) · [Español](docs/strategies.es.md) · [Русский](docs/strategies.ru.md)
 
-- Свечные графики, таймфреймы 15m–1M, индикаторы (MA/EMA/RSI/MACD/ATR/Supertrend и др.).
-- Источники данных с каскадом фолбэков: BingX → Binance → Bybit → OKX для крипты,
-  Yahoo Finance для акций/сырья.
-- Редактор стратегий и движок бэктеста.
-- Сигналы/вебхуки в Telegram (по желанию).
-- Интеграция с биржей BingX (по умолчанию выключена; ключи хранятся зашифрованными).
+## Features
 
-## Запуск из исходников
+- Candlestick charts, timeframes 15m–1M, indicators (MA/EMA/RSI/MACD/ATR/Supertrend and more).
+- Data sources with a fallback cascade: BingX → Binance → Bybit → OKX for crypto,
+  Yahoo Finance for stocks/commodities.
+- Strategy editor and back-testing engine (Python, sandboxed).
+- Signals / webhooks to Telegram (optional).
+- Optional e-mail alerts to your own mailbox (SMTP; personal, single recipient).
+- BingX exchange integration (disabled by default; keys are stored encrypted).
+
+## Run from source
 
 ```bash
 python -m venv .venv
@@ -31,47 +34,49 @@ pip install -r requirements.txt
 python -m app.launcher
 ```
 
-Откроется браузер на `http://127.0.0.1:<случайный_порт>/`.
+The browser opens at `http://127.0.0.1:<random free port>/`.
 
-Переменные окружения:
-- `RAWANGA_DATA_DIR` — каталог данных (по умолчанию `./data`).
-- `RAWANGA_HOST` / `RAWANGA_PORT` — адрес/порт (по умолчанию `127.0.0.1` и свободный порт).
+Environment variables:
 
-## Сборка портативного билда
+- `RAWANGA_DATA_DIR` — data directory (default `./data`).
+- `RAWANGA_HOST` / `RAWANGA_PORT` — address/port (default `127.0.0.1` and a free port).
 
-Локально:
+## Build the portable bundle
+
+Locally:
 
 ```bash
 pip install pyinstaller
 pyinstaller rawanga_trading_desk.spec --clean --noconfirm
-# результат: dist/RawangaTradingDesk/
+# result: dist/RawangaTradingDesk/
 ```
 
-Через GitHub Actions: пуш тега `v*` → собираются артефакты под Windows x64,
-macOS (Intel и Apple Silicon) и Linux (см. `.github/workflows/build.yml`).
+Via GitHub Actions: push a `v*` tag → artifacts are built for Windows x64,
+macOS (Intel and Apple Silicon) and Linux (see `.github/workflows/build.yml`).
 
-> Артефакты из CI **не подписаны**. Пользователю macOS может потребоваться
-> `xattr -dr com.apple.quarantine <путь>`; Windows покажет предупреждение
-> SmartScreen. Для чистой раздачи нужны сертификаты подписи.
+> CI artifacts are **not code-signed**. macOS users may need
+> `xattr -dr com.apple.quarantine <path>`; Windows will show a SmartScreen
+> warning. Clean distribution requires signing certificates.
 
-## Структура
+## Layout
 
 ```
-app/         бэкенд (FastAPI) + движок + лаунчер
-static/      веб-интерфейс
-strategies/  примеры стратегий
-data/        пользовательские данные (создаётся при запуске; НЕ коммитить)
+app/         backend (FastAPI) + engine + launcher
+static/      web interface
+strategies/  sample strategies
+docs/        installation guide (RTFM) and strategy docs (EN/ES/RU)
+data/        user data (created at runtime; do NOT commit)
 ```
 
-## Лицензия
+## License
 
-Apache License 2.0 — см. `LICENSE`. Переиспользование разрешено при сохранении
-указания авторства и файла `NOTICE`.
+Apache License 2.0 — see `LICENSE`. Reuse is permitted provided you keep the
+attribution and the `NOTICE` file.
 
-Сторонние компоненты — см. `THIRD-PARTY-NOTICES.txt` и `licenses/`.
+Third-party components — see `THIRD-PARTY-NOTICES.txt` and `licenses/`.
 
-## Правовые оговорки
+## Legal notes
 
-⚠️ Проект **не связан** с TradingView, Inc., BingX и другими упомянутыми
-сервисами. См. `TRADEMARKS.md`. ПО предоставляется «как есть», **не является
-инвестиционной рекомендацией**; торговля — на риск пользователя.
+⚠️ This project is **not affiliated** with TradingView, Inc., BingX or any other
+mentioned service. See `TRADEMARKS.md`. The software is provided "as is", is
+**not investment advice**; trading is at the user's own risk.

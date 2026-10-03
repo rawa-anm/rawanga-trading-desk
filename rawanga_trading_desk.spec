@@ -1,16 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 # Copyright (c) 2026 Andrei Maltsev (Rawanga). All rights reserved.
 #
-# PyInstaller spec для Rawanga Trading Desk (portable, onedir).
-# Сборка:  pyinstaller rawanga_trading_desk.spec --clean --noconfirm
-# Результат: dist/RawangaTradingDesk/  (onedir). Данные пользователя — рядом, в data/.
+# PyInstaller spec for Rawanga Trading Desk (portable, onedir).
+# Build:    pyinstaller rawanga_trading_desk.spec --clean --noconfirm
+# Result:   dist/RawangaTradingDesk/  (onedir). User data lives next to it, in data/.
 
 import sys
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
-# Доп. скрытые импорты для uvicorn/fastapi/движка (динамическая загрузка "app.main:app").
+# Extra hidden imports for uvicorn/fastapi/engine (dynamic load of "app.main:app").
 hidden = (
     collect_submodules("uvicorn")
     + collect_submodules("fastapi")
