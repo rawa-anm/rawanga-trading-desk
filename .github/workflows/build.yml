@@ -16,9 +16,9 @@ jobs:
         include:
           - os: windows-latest        # Windows x64  -> .exe
             artifact: RawangaTradingDesk-windows-x64
-          - os: macos-13              # macOS Intel -> .app
+          - os: macos-15-intel        # macOS Intel -> .app
             artifact: RawangaTradingDesk-macos-x64
-          - os: macos-14              # macOS Apple Silicon
+          - os: macos-15              # macOS Apple Silicon
             artifact: RawangaTradingDesk-macos-arm64
           - os: ubuntu-latest         # Linux x64 (bonus)
             artifact: RawangaTradingDesk-linux-x64
