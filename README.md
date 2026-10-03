@@ -6,6 +6,8 @@ data is stored next to the application (`data/`).
 
 - Website: https://rawanga.es
 - Partner link (BingX): https://bingx.com/partner/rawa/
+- **Download (prebuilt, portable):** [latest release](https://github.com/rawa-anm/rawanga-trading-desk/releases/latest)
+  — Windows x64 (`.zip`), macOS Intel / Apple Silicon (`.tar.gz`), Linux x64 (`.tar.gz`).
 
 > Intended use: **individual, single-user**. There is no authentication and no
 > multi-user separation — see the RTFM guide before hosting anywhere.
@@ -51,8 +53,9 @@ pyinstaller rawanga_trading_desk.spec --clean --noconfirm
 # result: dist/RawangaTradingDesk/
 ```
 
-Via GitHub Actions: push a `v*` tag → artifacts are built for Windows x64,
-macOS (Intel and Apple Silicon) and Linux (see `.github/workflows/build.yml`).
+Prebuilt portable bundles are published on the [Releases](https://github.com/rawa-anm/rawanga-trading-desk/releases)
+page for every `v*` tag: Windows x64, macOS Intel, macOS Apple Silicon, Linux x64
+(built by GitHub Actions — see `.github/workflows/build.yml`). Download, unpack, run.
 
 > CI artifacts are **not code-signed**. macOS users may need
 > `xattr -dr com.apple.quarantine <path>`; Windows will show a SmartScreen
