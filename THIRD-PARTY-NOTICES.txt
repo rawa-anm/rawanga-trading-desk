@@ -1,0 +1,48 @@
+Rawanga TV — Portable Edition
+THIRD-PARTY SOFTWARE NOTICES
+Copyright (c) 2026 Andrei Maltsev (Rawanga AI)
+
+================================================================================
+1. TradingView Lightweight Charts(TM) v4.2.0
+   Файл: static/js/lightweight-charts.standalone.production.js
+   Copyright (c) 2024 TradingView, Inc.
+   Лицензия: Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0
+   Предоставляется «как есть». Текст лицензии сохранён в заголовке файла.
+   Торговые марки и логотипы TradingView принадлежат TradingView, Inc. и не
+   используются для продвижения данного продукта.
+
+================================================================================
+2. Сторонние Python-библиотеки (пермиссивные лицензии MIT/BSD/Apache/MPL):
+   - aiosqlite 0.22.1: MIT License
+   - annotated-doc 0.0.5: MIT
+   - annotated-types 0.8.0: MIT
+   - anyio 4.15.1: MIT
+   - certifi 2026.7.22: MPL-2.0
+   - click 8.5.0: BSD-3-Clause
+   - cryptography 50.0.2: Apache-2.0 OR BSD-3-Clause
+   - fastapi 0.141.1: MIT
+   - h11 0.16.0: MIT
+   - httpcore 1.0.9: BSD-3-Clause
+   - httpx 0.28.1: BSD-3-Clause
+   - idna 3.20: BSD-3-Clause
+   - numpy 2.5.3: BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
+   - pandas 3.0.6: BSD 3-Clause License
+   - pillow 12.3.0: MIT-CMU
+   - pydantic 2.13.5: MIT
+   - pydantic_core 2.46.5: MIT
+   - python-dateutil 2.9.0.post0: Dual License
+   - python-dotenv 1.2.3: BSD-3-Clause
+   - PyYAML 6.0.3: MIT
+   - six 1.17.0: MIT
+   - starlette 1.6.0: BSD-3-Clause
+   - typing_extensions 4.16.0: PSF-2.0
+   - uvicorn 0.53.0: BSD-3-Clause
+   - uvloop 0.22.1: MIT License
+   - watchfiles 1.3.0: MIT
+   - websocket-client 1.9.2: Apache-2.0
+   - websockets 17.1: BSD-3-Clause
+
+Ни один из компонентов не является копилефт-лицензией (GPL/AGPL отсутствуют),
+что позволяет распространять ПО под проприетарной лицензией.
+Полные тексты лицензий — в метаданных пакетов; по требованию прилагаются в
+каталоге licenses/.

@@ -1,0 +1,72 @@
+# Copyright (c) 2026 Andrei Maltsev (Rawanga). All rights reserved.
+# Сборка портативных билдов Rawanga Trading Desk под все ОС на бесплатных раннерах GitHub.
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest        # Windows x64  -> .exe
+            artifact: RawangaTradingDesk-windows-x64
+          - os: macos-13              # macOS Intel -> .app
+            artifact: RawangaTradingDesk-macos-x64
+          - os: macos-14              # macOS Apple Silicon
+            artifact: RawangaTradingDesk-macos-arm64
+          - os: ubuntu-latest         # Linux x64 (бонус)
+            artifact: RawangaTradingDesk-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build (PyInstaller onedir)
+        run: pyinstaller rawanga_trading_desk.spec --clean --noconfirm
+
+      - name: Archive (unix)
+        if: runner.os != 'Windows'
+        run: cd dist && tar czf ../${{ matrix.artifact }}.tar.gz RawangaTradingDesk
+
+      - name: Archive (windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/RawangaTradingDesk -DestinationPath ${{ matrix.artifact }}.zip
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.zip
+            ${{ matrix.artifact }}.tar.gz
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          # Примечание: артефакты НЕ подписаны. macOS-пользователю: xattr -dr com.apple.quarantine;
+          # Windows: SmartScreen-предупреждение. Для чистой раздачи нужны сертификаты (см. README).

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<!--
+  Copyright 2026 Andrei Maltsev (Rawanga)
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rawanga Trading Desk</title>
+<style>
+  :root{--bg:#0e1117;--panel:#161b22;--line:#232b36;--txt:#d5dae3;--mut:#7d8796;--up:#26a69a;--dn:#ef5350;--acc:#3b82f6;--grid:#1b2129;--hover:#1c2230;--sel:#1e2930;--ctrl:#1e2530;--input:#0e1117}
+  body.light{--bg:#f4f6f9;--panel:#ffffff;--line:#d7dee6;--txt:#1d2530;--mut:#63707e;--up:#1a9e8f;--dn:#e0403d;--acc:#2563eb;--grid:#e7ecf1;--hover:#eef2f7;--sel:#e3ecfb;--ctrl:#eef1f5;--input:#ffffff}
+  *{box-sizing:border-box}
+  body{margin:0;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);height:100vh;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:14px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:14px;margin:0;font-weight:600}
+  .badge{font-size:11px;color:var(--mut)}
+  .main{flex:1;display:flex;min-height:0}
+  .left{flex:1;display:flex;flex-direction:column;min-width:0}
+  #chart{flex:1;min-height:0}
+  .oscpane{height:110px;flex-shrink:0;border-top:1px solid var(--line);display:none}
+  .oscpane.on{display:block}
+  .indbar{display:flex;flex-direction:column;gap:5px;padding:7px 12px;background:var(--panel);border-top:1px solid var(--line);font-size:12px}
+  .ibar{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+  .ibar+.ibar{border-top:1px solid var(--line);padding-top:5px}
+  .indbar label{display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--mut)}
+  .indbar label.on{color:var(--txt)}
+  .right{width:250px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;flex-shrink:0}
+  .cat{padding:8px 12px 4px;font-size:11px;text-transform:uppercase;color:var(--mut);letter-spacing:.5px}
+  .inst{padding:8px 14px;cursor:pointer;border-left:2px solid transparent;display:flex;justify-content:space-between}
+  .inst:hover{background:var(--hover)}
+  .inst.active{background:var(--sel);border-left-color:var(--acc)}
+  .inst .sym{font-weight:600}
+  .inst .px{color:var(--mut);font-variant-numeric:tabular-nums}
+  #chart{position:relative}
+  .hvolcanvas{position:absolute;inset:0;pointer-events:none;z-index:3}
+  .tfbar{display:flex;gap:6px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .tf{padding:2px 9px;border-radius:4px;cursor:pointer;color:var(--mut);font-size:12px}
+  .tf.active{background:var(--acc);color:#fff}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-left:auto}
+  .strat{display:flex;align-items:center;gap:5px;color:var(--mut);margin-left:12px;padding-left:12px;border-left:1px solid var(--line)}
+  .cat-hdr{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 4px}
+  .cat-hdr .cat{padding:0}
+  .cat-hdr .plus{cursor:pointer;color:var(--acc);font-weight:700;font-size:15px;padding:0 4px}
+  .inst .del{color:#5c6673;display:none;padding:0 3px;font-weight:700}
+  .inst:hover .del{display:inline}
+  .inst .del:hover{color:var(--dn)}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal.open{display:flex}
+  .modal .box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;width:440px;max-height:80vh;overflow:auto}
+  .modal .box.wide{width:820px;max-width:94vw}
+  .modal h3{margin:0 0 14px;font-size:14px}
+  .modal label{display:block;margin:8px 0 3px;font-size:12px;color:var(--mut)}
+  .modal input,.modal select{width:100%;padding:5px 8px;background:var(--input);border:1px solid var(--line);border-radius:4px;color:var(--txt)}
+  .modal .row{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+  .modal .wh{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:8px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .modal .wh .icn{cursor:pointer;padding:0 4px;color:#8b96a5;font-size:13px}
+  .modal .wh .icn:hover{color:var(--txt)}
+  .modal .wh .icn.del:hover{color:var(--dn)}
+  .modal .whedit{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}
+  .modal .whedit label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mut)}
+  .modal .whedit input,.modal .whedit select{padding:3px 6px;font-size:12px}
+  .modal .whedit .whbtns{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end}
+  #whList{max-height:52vh;overflow:auto}
+  .prow{display:grid;grid-template-columns:1fr 90px 64px;gap:8px;align-items:center;margin:6px 0}
+  .prow label{margin:0;font-size:12px}
+  .prow .scopebox{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--mut);white-space:nowrap}
+  .prow .star{background:transparent;border:1px solid var(--line);color:#8b95a3;border-radius:6px;cursor:pointer;padding:2px 6px;font-size:13px;line-height:1}
+  .prow .star:hover{border-color:var(--acc);color:var(--acc)}
+  .prow .star.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .psep{font-size:11px;color:var(--mut);margin:12px 0 4px;border-top:1px solid var(--line);padding-top:8px}
+  .mcell{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #37414d;margin:1px;cursor:pointer}
+  .mcell.on{background:#26a69a;border-color:#26a69a}
+  .mcell.off{background:#3a2222}
+  .mgrid{font-size:10px;color:var(--mut);margin-top:4px;border-collapse:collapse}
+  .mgrid td,.mgrid th{padding:2px 5px;text-align:center}
+  .mgrid th{color:#8b95a3}
+  .journal{width:340px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;flex-shrink:0;display:none;flex-direction:column}
+  .journal.on{display:flex}
+  .journal h2{font-size:13px;margin:0;padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .journal .cls{cursor:pointer;color:var(--mut);font-size:15px;padding:0 4px}
+  .journal .cls:hover{color:var(--dn)}
+  .jsum{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--hover)}
+  .jsum .big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .jsum .rowline{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:3px}
+  .jperiod{display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--line)}
+  .jperiod button{flex:1;font-size:11px;padding:3px 0}
+  .jperiod button.active{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .jtrade{display:grid;grid-template-columns:60px 1fr auto;gap:6px;padding:7px 14px;border-bottom:1px solid var(--line);font-size:12px;font-variant-numeric:tabular-nums}
+  .jtrade .dir{font-weight:700}
+  .jtrade .dir.long{color:var(--up)}
+  .jtrade .dir.short{color:var(--dn)}
+  .jtrade .pxs{color:var(--mut);font-size:11px}
+  .jtrade .pl{font-weight:700;text-align:right}
+  .jtrade .pl.pos{color:var(--up)}
+  .jtrade .pl.neg{color:var(--dn)}
+  .jtrade.selrow{background:var(--sel);box-shadow:inset 2px 0 0 var(--acc)}
+  .jtrade:hover{background:var(--hover)}
+  .jopen{padding:9px 14px;border-bottom:1px solid var(--line);font-size:12px;background:var(--sel)}
+  .bal{font-variant-numeric:tabular-nums;font-weight:600}
+  .bal.pos{color:var(--up)} .bal.neg{color:var(--dn)}
+  .tk{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .tk .icn{cursor:pointer;color:#8b96a5;padding:0 4px}
+  .tk .icn:hover{color:var(--txt)}
+  .tk .icn.del:hover{color:var(--dn)}
+  .tk.off{opacity:.5}
+  select,button{background:var(--ctrl);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:3px 8px;font-size:12px}
+  .brand{font-size:11px;color:var(--mut);margin-left:4px}
+  .brand a{color:var(--acc);text-decoration:none}
+  .brand a:hover{text-decoration:underline}
+  .appfoot{font-size:11px;color:var(--mut);text-align:center;padding:5px 10px;background:var(--panel);border-top:1px solid var(--line);flex-shrink:0}
+  .appfoot a{color:var(--acc);text-decoration:none}
+  .appfoot a:hover{text-decoration:underline}
+  .appfoot .fine{color:var(--mut);opacity:.8;margin-top:2px}
+  button{cursor:pointer}
+  .mdoc{font-size:13px;line-height:1.55}
+  .mdoc h1{font-size:19px;margin:.2em 0 .6em}
+  .mdoc h2{font-size:16px;margin:1.2em 0 .5em;border-bottom:1px solid var(--line);padding-bottom:3px}
+  .mdoc h3{font-size:14px;margin:1em 0 .4em}
+  .mdoc code{background:var(--ctrl);padding:1px 5px;border-radius:3px;font-family:monospace;font-size:12px}
+  .mdoc pre{background:var(--input);border:1px solid var(--line);border-radius:5px;padding:10px;overflow:auto}
+  .mdoc pre code{background:none;padding:0}
+  .mdoc a{color:var(--acc)}
+  .mdoc ul,.mdoc ol{padding-left:22px}
+  .mdoc hr{border:none;border-top:1px solid var(--line);margin:1em 0}
+  .mdoc table{border-collapse:collapse;margin:.6em 0}
+  .mdoc th,.mdoc td{border:1px solid var(--line);padding:3px 8px;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔧 Rawanga Trading Desk</h1>
+  <span class="badge" id="status" data-i18n="status.loading">loading…</span>
+  <span class="brand"><a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a> · <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener" data-i18n="brand.trade">Trade on BingX</a></span>
+  <div class="toolbar">
+    <select id="langsel" title="Language" style="width:auto">
+      <option value="en">EN</option>
+      <option value="ru">RU</option>
+      <option value="es">ES</option>
+    </select>
+    <select id="tfsel">
+      <option>1h</option><option>15m</option><option>4h</option><option>1d</option>
+      <option>1w</option><option>1M</option>
+    </select>
+    <button onclick="loadBars(true)" data-i18n="btn.refresh">⟳ Refresh</button>
+    <button id="themebtn" onclick="toggleTheme()" data-i18n-title="tt.theme" title="Day/Night">🌙</button>
+    <button id="aboutbtn" onclick="openModal('modalAbout')" data-i18n-title="tt.about" title="About">ℹ</button>
+  </div>
+</header>
+<div class="main">
+  <div class="left">
+    <div id="chart"></div>
+    <div class="oscpane" id="pane-rsi" data-pane="rsi"></div>
+    <div class="oscpane" id="pane-macd" data-pane="macd"></div>
+    <div class="oscpane" id="pane-adx" data-pane="adx"></div>
+    <div class="tfbar" id="tfbar"></div>
+    <div class="indbar">
+      <div class="ibar">
+      <label class="on"><input type="checkbox" checked disabled> <span data-i18n="ind.candles">candles</span></label>
+      <label class="on"><input type="checkbox" id="i-vol" checked> <span data-i18n="ind.volume">volume</span></label>
+      <label class="on"><input type="checkbox" id="i-hvol" checked> <span data-i18n="ind.hvol">volume (horiz.)</span></label>
+      <label><input type="checkbox" id="i-vma"> <span data-i18n="ind.vma">Vol MA20</span></label>
+      <label class="on"><input type="checkbox" id="i-sma50" checked> SMA50</label>
+      <label class="on"><input type="checkbox" id="i-sma200" checked> SMA200</label>
+      <label><input type="checkbox" id="i-ema"> EMA200</label>
+      <label class="on"><input type="checkbox" id="i-st" checked> <span data-i18n="ind.supertrend">Supertrend</span></label>
+      <label class="on"><input type="checkbox" id="i-don" checked> <span data-i18n="ind.donchian">Donchian</span></label>
+      <label><input type="checkbox" id="i-bb"> <span data-i18n="ind.bollinger">Bollinger</span></label>
+      <label><input type="checkbox" id="i-rsi"> RSI</label>
+      <label><input type="checkbox" id="i-macd"> MACD</label>
+      <label><input type="checkbox" id="i-adx"> ADX</label>
+      </div>
+      <div class="ibar">
+      <span class="strat" style="border-left:none;padding-left:0;margin-left:0" data-i18n="bar.trades">trades:</span>
+      <label class="on"><input type="checkbox" id="s-rawa" checked> <span style="color:#ffb300">■</span> Rawa</label>
+      <label><input type="checkbox" id="s-stv3"> <span style="color:#42a5f5">■</span> STv3</label>
+      <div class="strat"><span data-i18n="bar.strategy">strategy:</span> <select id="stratsel"></select></div>
+      <div class="strat"><button onclick="openParams()" data-i18n="btn.params">⚙ parameters</button></div>
+      <div class="strat"><button onclick="openWebhooks()" data-i18n="btn.webhooks">🔔 webhooks</button></div>
+      <div class="strat"><button onclick="openPine()" data-i18n="btn.editor">🧩 Strategy editor</button></div>
+      <div class="strat"><button onclick="openDocs()" data-i18n="btn.docs">📘 Strategy docs</button></div>
+      <span class="badge" style="margin-left:auto" id="sigcapt"></span>
+      <span class="badge" style="margin-left:8px" id="srcline"></span>
+      </div>
+      <div class="ibar">
+      <span class="strat" style="border-left:none;padding-left:0;margin-left:0" data-i18n="bar.trading">trading:</span>
+      <label class="on"><input type="checkbox" id="t-live"> <span data-i18n="trade.live">real BingX trading</span></label>
+      <div class="strat"><button onclick="openTrade()" data-i18n="btn.tradeSettings">💹 settings</button></div>
+      <div class="strat"><button onclick="openTickers()" data-i18n="btn.tickers">📋 traded tickers</button></div>
+      <span class="badge bal" id="acctbal" style="margin-left:auto" data-i18n="acct.balance">balance: —</span>
+      </div>
+    </div>
+  </div>
+  <div class="right" id="list"></div>
+  <div class="journal" id="journal"></div>
+</div>
+</div>
+<div class="modal" id="modalParams"><div class="box">
+  <h3 id="paramsTitle" data-i18n="params.title">Strategy parameters</h3>
+  <div class="badge" id="paramsScope" style="display:block;margin-bottom:10px"></div>
+  <div id="paramsForm"></div>
+  <div class="row"><button onclick="closeModal('modalParams')" data-i18n="btn.cancel">Cancel</button>
+  <button onclick="saveParams()" style="background:var(--acc);color:#fff" data-i18n="btn.save">Save</button></div>
+</div></div>
+<div class="modal" id="modalWh"><div class="box">
+  <h3 data-i18n="wh.title">Webhooks</h3>
+  <div id="whList"></div>
+  <label data-i18n="wh.strategy">Strategy</label><select id="whStrategy"></select>
+  <label data-i18n="wh.symbol">Instrument ("*" — all)</label><input id="whSymbol" value="*">
+  <label data-i18n="wh.chatId">Chat ID (empty — your private)</label><input id="whChat" data-i18n-ph="wh.chatPh" placeholder="your Chat ID">
+  <label data-i18n="wh.thread">Thread ID (optional, for topics)</label><input id="whThread" placeholder="">
+  <div class="row"><button onclick="closeModal('modalWh')" data-i18n="btn.close">Close</button>
+  <button onclick="addWebhook()" style="background:var(--acc);color:#fff" data-i18n="btn.add">Add</button></div>
+</div></div>
+<div class="modal" id="modalPine"><div class="box wide">
+  <h3 data-i18n="editor.title">Strategy editor (Python)</h3>
+  <div class="badge" style="display:block;margin-bottom:8px" data-i18n="editor.hint">Available: open/high/low/close/volume · inputs inp(name, default, title, type) · indicators sma/ema/rma/rsi/macd/atr/supertrend/adx/donchian/bb · crossover/crossunder · signals entry('long'|'short', cond) and exit(cond) · drawing plot/shape/hline. Combine conditions with &amp; | ~.</div>
+  <label data-i18n="editor.name">Strategy name</label><input id="pnName" data-i18n-ph="editor.namePh" placeholder="My Strategy">
+  <label data-i18n="editor.code">Strategy code (Python)</label>
+  <textarea id="pnSrc" spellcheck="false" style="width:100%;height:280px;font-family:monospace;font-size:12px;background:var(--input);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:8px"></textarea>
+  <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+    <button onclick="pineValidate()" data-i18n="editor.check">🔎 Check</button>
+    <button onclick="pineCompile()" style="background:var(--acc);color:#fff" data-i18n="editor.compile">⚙ Compile (strategy)</button>
+    <button onclick="pineApply()" style="background:var(--up);color:#fff" data-i18n="editor.toChart">🧷 To chart (indicator)</button>
+    <button onclick="pineClear()" data-i18n="editor.clear">✖ Remove from chart</button>
+    <button onclick="exportStrategy()" style="background:var(--acc);color:#fff" data-i18n="editor.export">⬇ Export strategy</button>
+    <label class="strat" style="cursor:pointer;margin:0"><span data-i18n="editor.import">⬆ Import</span><input type="file" accept=".json,.rwd.json,.txt" onchange="importStrategyFile(this)" style="display:none"></label>
+    <button onclick="openDocs()" data-i18n="btn.docs">📘 Strategy docs</button>
+    <span class="strat" style="margin-left:auto"><span data-i18n="editor.sample">Sample:</span> <select id="pnLoad" onchange="pineLoadSample(this.value)"><option value="">—</option></select></span>
+  </div>
+  <label style="margin-top:8px"><span data-i18n="editor.saved">Saved strategies:</span> <select id="pnSaved" onchange="pinePickSaved(this.value)"><option value="">— choose —</option></select></label>
+  <div id="pnDiag" style="margin-top:10px;font-size:12px;max-height:180px;overflow:auto"></div>
+  <div class="row"><button onclick="closeModal('modalPine')" data-i18n="btn.close">Close</button></div>
+</div></div>
+<div class="modal" id="modalDocs"><div class="box wide">
+  <h3 data-i18n="docs.title">Writing trading strategies</h3>
+  <div id="docsBody" class="mdoc" style="max-height:66vh;overflow:auto"></div>
+  <div class="row"><button onclick="closeModal('modalDocs')" data-i18n="btn.close">Close</button></div>
+</div></div>
+<div class="modal" id="modalTrade"><div class="box">
+  <h3 data-i18n="trade.title">BingX trading (futures / swap)</h3>
+  <div id="trWarn" class="badge" style="margin-bottom:8px"></div>
+  <label><span data-i18n="trade.apiKey">API Key</span> (<span id="trKeyMask">—</span>)</label><input id="trApiKey" autocomplete="off" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
+  <label data-i18n="trade.secret">Secret Key</label><input id="trSecret" type="password" autocomplete="new-password" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
+  <label data-i18n="trade.fundPw">Fund password (required for real trading)</label><input id="trFundPw" type="password" autocomplete="new-password" data-i18n-ph="trade.fundPwPh" placeholder="confirmation to enable live">
+  <label data-i18n="trade.env">Environment</label><select id="trEnv"><option value="live" data-i18n="trade.envLive">Live</option><option value="vst" data-i18n="trade.envVst">Simulation (testnet VST)</option></select>
+  <label data-i18n="trade.lev">Leverage (1–125)</label><input id="trLev" type="number" min="1" max="125" value="5">
+  <label data-i18n="trade.pct">% of balance per position</label><input id="trPct" type="number" min="0.1" step="0.1" value="10">
+  <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+  <label><span data-i18n="trade.notifyToken">Bot token for trade alerts</span> (<span id="trTgMask">—</span>)</label>
+  <input id="trNotifyToken" type="password" autocomplete="new-password" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
+  <label data-i18n="trade.notifyChat">Recipient TG id (private)</label>
+  <input id="trNotifyChat" data-i18n-ph="wh.chatPh" placeholder="your Chat ID">
+  <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
+  <label><span data-i18n="trade.mailTitle">E-mail alerts (optional)</span> (<span id="trMailMask">—</span>)</label>
+  <div class="pxs" style="font-size:10px;color:var(--mut);margin:-4px 0 6px" data-i18n="trade.mailNote">Personal alerts only — e-mails go to this single address.</div>
+  <input id="trSmtpHost" data-i18n-ph="trade.smtpHostPh" placeholder="smtp.example.com">
+  <div class="row" style="gap:6px">
+    <input id="trSmtpPort" style="flex:1" placeholder="587" inputmode="numeric">
+    <label style="display:flex;align-items:center;gap:6px;margin:0"><input id="trSmtpTls" type="checkbox" checked style="width:auto"><span data-i18n="trade.smtpTls">STARTTLS</span></label>
+  </div>
+  <label data-i18n="trade.smtpUser">SMTP login</label>
+  <input id="trSmtpUser" autocomplete="off" placeholder="you@example.com">
+  <label data-i18n="trade.smtpPass">SMTP password / app password</label>
+  <input id="trSmtpPass" type="password" autocomplete="new-password" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
+  <label data-i18n="trade.mailTo">Send alerts to (e-mail)</label>
+  <input id="trNotifyEmail" placeholder="you@example.com">
+  <div class="row"><button onclick="clearKeys()" data-i18n="trade.clearKeys">Delete keys</button>
+  <button onclick="testNotify()" data-i18n="trade.testNotify">✈ Test alert</button>
+  <button onclick="closeModal('modalTrade')" data-i18n="btn.close">Close</button>
+  <button onclick="saveTrade()" style="background:var(--acc);color:#fff" data-i18n="btn.save">Save</button></div>
+</div></div>
+<div class="modal" id="modalTickers"><div class="box">
+  <h3 data-i18n="tickers.title">Traded tickers (trading only for added ones)</h3>
+  <div id="tkList"></div>
+  <div class="row" style="justify-content:flex-start;gap:6px;margin-top:6px">
+    <select id="tkSym" style="flex:1"></select>
+    <button onclick="addTicker()" style="background:var(--acc);color:#fff" data-i18n="tickers.add">Add</button>
+  </div>
+  <div class="row"><button onclick="closeModal('modalTickers')" data-i18n="btn.close">Close</button></div>
+</div></div>
+<div class="modal" id="modalInst"><div class="box">
+  <h3 data-i18n="inst.title">Add instrument</h3>
+  <label data-i18n="inst.ticker">Ticker</label><input id="insSymbol" placeholder="SOL">
+  <label data-i18n="inst.name">Name</label><input id="insTitle" placeholder="Solana">
+  <label data-i18n="inst.category">Category</label><select id="insCat"><option value="crypto" data-i18n="cat.crypto">Cryptocurrencies</option><option value="stocks" data-i18n="cat.stocks">Stocks</option><option value="energy" data-i18n="cat.energy">Energy</option><option value="metals" data-i18n="cat.metals">Metals</option><option value="indices" data-i18n="cat.indices">Indices</option></select>
+  <label data-i18n="inst.dataType">Data type</label><select id="insKind"><option value="crypto" data-i18n="inst.kindCrypto">crypto (BingX/Binance/Bybit/OKX)</option><option value="stock" data-i18n="inst.kindStock">exchange/commodity (Yahoo)</option></select>
+  <label data-i18n="inst.yahoo">Yahoo symbol (for stocks/commodities)</label><input id="insYahoo" placeholder="SOL-USD">
+  <div class="row"><button onclick="closeModal('modalInst')" data-i18n="btn.cancel">Cancel</button>
+  <button onclick="addInstrument()" style="background:var(--acc);color:#fff" data-i18n="btn.add">Add</button></div>
+</div></div>
+<div class="modal" id="modalAbout"><div class="box">
+  <h3>Rawanga Trading Desk</h3>
+  <p style="font-size:12px;color:var(--mut)"><span data-i18n="about.tagline">Portable charting and signals terminal.</span><br>© 2026 Andrei Maltsev · Rawanga AI</p>
+  <p style="font-size:12px">
+    <span data-i18n="about.site">Site:</span> <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a><br>
+    <span data-i18n="about.partner">Partner link:</span> <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener">bingx.com/partner/rawa/</a>
+  </p>
+  <p style="font-size:11px;color:var(--mut)" data-i18n="about.license">License: Apache License 2.0. Software is provided “as is”, not investment advice.</p>
+  <p style="font-size:11px;color:var(--mut)" data-i18n="about.thirdparty">Third-party components: TradingView Lightweight Charts™ (Apache-2.0) and others — see THIRD-PARTY-NOTICES.txt.</p>
+  <div class="row"><button onclick="closeModal('modalAbout')" data-i18n="btn.close">Close</button></div>
+</div></div>
+<footer class="appfoot">
+  <div>© 2026 Andrei Maltsev · Rawanga AI · <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a> · <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener" data-i18n="brand.trade">Trade on BingX</a></div>
+</footer>
+<script src="/static/js/i18n.js"></script>
+<script src="/static/js/lightweight-charts.standalone.production.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Данные пользователя — НИКОГДА не коммитить (БД, ключи, история)
+data/
+state/
+logs/
+*.db
+*.db-journal
+*.enc
+*.key
+*.log
+
+# Сборка / окружение
+.venv/
+venv/
+build/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+*.spec.bak
+*.bak_*
+
+# ОС / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Чужая документация (BingX) — не распространяем (своя docs/strategies.*.md коммитится)
+docs/bingx/
+.venv-build/
+
+# Internal production changelog (host/infra details) — not for public repo
+CHANGELOG.md
