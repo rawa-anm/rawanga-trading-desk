@@ -83,3 +83,9 @@ Third-party components — see `THIRD-PARTY-NOTICES.txt` and `licenses/`.
 ⚠️ This project is **not affiliated** with TradingView, Inc., BingX or any other
 mentioned service. See `TRADEMARKS.md`. The software is provided "as is", is
 **not investment advice**; trading is at the user's own risk.
+
+⚠️ **Strategies you import from others are your responsibility.** Third-party
+`.rwd.json` strategies are not written, reviewed or vetted by the author. Import
+only from trusted sources and inspect the `source` code first — the sandbox limits
+what imported code can do, but it is not a guarantee of safety, correctness or
+profitability. Do not import untrusted strategies.

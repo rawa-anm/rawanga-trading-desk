@@ -503,6 +503,16 @@ El archivo es JSON plano con esta estructura:
 > un archivo compartido nunca puede ejecutar nada inseguro. Para la lógica solo
 > importa el campo `source` — los demás campos son metadatos.
 
+> ⚠️ **Importar estrategias de terceros conlleva riesgo: importa solo de fuentes en
+> las que confíes.** El entorno aislado bloquea el acceso directo al sistema, a los
+> archivos y a la red, pero no juzga la intención: una estrategia compartida puede
+> seguir siendo defectuosa, engañosa o abusar del cómputo permitido. **Revisa siempre
+> el código del campo `source` antes de importar** y trata cada `.rwd.json` importado
+> como entrada no confiable. El autor no escribe ni revisa estrategias de terceros y
+> no se responsabiliza de ellas ni de las pérdidas que causen. A medida que crezca la
+> base de usuarios, analiza las estrategias importadas en busca de inyecciones
+> maliciosas o virales antes de ejecutarlas.
+
 ---
 
 ## 9. Compilación
@@ -671,6 +681,13 @@ entry('short', crossunder(close, lower))
 El software se proporciona «tal cual», sin garantía de ningún tipo. El rendimiento
 pasado no garantiza resultados futuros. Prueba siempre tus estrategias y nunca
 arriesgues más de lo que puedas permitirte perder.
+
+**Las estrategias de terceros son tu responsabilidad.** Las estrategias que importas
+de otros (`.rwd.json`) no están escritas, revisadas ni verificadas por el autor.
+Importa solo de fuentes de confianza y revisa primero el código del campo `source`:
+el entorno aislado limita lo que puede hacer el código importado, pero no garantiza
+que sea seguro, correcto o rentable. El autor no se responsabiliza de las estrategias
+de terceros ni de los daños y pérdidas causados por importarlas o ejecutarlas.
 
 ---
 

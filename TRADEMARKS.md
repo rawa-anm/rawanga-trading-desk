@@ -31,6 +31,20 @@ investment, financial or legal advice**. Trading crypto assets and derivatives
 involves a high risk of total loss of funds. All decisions and risks are the
 user's own.
 
+## Third-party strategies (imported `.rwd.json`)
+
+The built-in strategy editor runs user code in a restricted sandbox (an AST
+whitelist: no `import`, `eval`, `exec`, file or network access). That sandbox limits
+what imported code can do, but it **does not guarantee** that a third-party strategy
+is safe, correct or profitable.
+
+A strategy imported from someone else was **not written, reviewed or vetted by the
+author**. Import `.rwd.json` files only from sources you trust, and **inspect the
+`source` code before running it**. Treat every imported strategy as untrusted input.
+The author is not responsible for third-party strategies or for any damage or losses
+caused by importing or running them. As the user base grows, scan imported
+strategies for malicious or viral injections before using them.
+
 ## Data
 
 Quotes are obtained from the public interfaces of the mentioned sources. Complying

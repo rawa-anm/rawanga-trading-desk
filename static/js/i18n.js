@@ -168,6 +168,7 @@
       'about.site': 'Site:',
       'about.partner': 'Partner link:',
       'about.license': 'License: Apache License 2.0. Software is provided “as is”, not investment advice.',
+      'about.importrisk': '⚠️ Imported strategies (.rwd.json) are third-party code, not vetted by the author. Import only from trusted sources and review the source first — the sandbox limits what imported code can do, but does not guarantee it is safe, correct or profitable.',
       'about.thirdparty': 'Third-party components: TradingView Lightweight Charts™ (Apache-2.0) and others — see THIRD-PARTY-NOTICES.txt.',
 
       'misc.loading': '{sym} · loading…',
@@ -346,6 +347,7 @@
       'about.site': 'Сайт:',
       'about.partner': 'Партнёрская ссылка:',
       'about.license': 'Лицензия: Apache License 2.0. ПО предоставляется «как есть», не является инвестиционной рекомендацией.',
+      'about.importrisk': '⚠️ Импортированные стратегии (.rwd.json) — чужой код, не проверенный автором. Импортируй только из источников, которым доверяешь, и сначала изучи поле source — песочница ограничивает возможности импортированного кода, но не гарантирует его безопасность, корректность или прибыльность.',
       'about.thirdparty': 'Сторонние компоненты: TradingView Lightweight Charts™ (Apache-2.0) и др. — см. THIRD-PARTY-NOTICES.txt.',
 
       'misc.loading': '{sym} · загрузка…',
@@ -523,6 +525,7 @@
       'about.site': 'Sitio:',
       'about.partner': 'Enlace de socio:',
       'about.license': 'Licencia: Apache License 2.0. El software se ofrece «tal cual», no es asesoramiento de inversión.',
+      'about.importrisk': '⚠️ Las estrategias importadas (.rwd.json) son código de terceros, no verificadas por el autor. Importa solo de fuentes de confianza y revisa primero el campo source — el entorno aislado limita lo que puede hacer el código importado, pero no garantiza que sea seguro, correcto o rentable.',
       'about.thirdparty': 'Componentes de terceros: TradingView Lightweight Charts™ (Apache-2.0) y otros — ver THIRD-PARTY-NOTICES.txt.',
 
       'misc.loading': '{sym} · cargando…',

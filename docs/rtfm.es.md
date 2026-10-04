@@ -270,6 +270,11 @@ sudo systemctl enable --now rawanga-trading-desk
   en el motor), **To chart (indicator)** (dibuja en el gráfico), **Remove from
   chart**, **Export strategy**, **Import**.
 - **Exportar/importar** usa el archivo `*.rwd.json` para compartir una estrategia.
+- ⚠️ **Importa estrategias solo de fuentes en las que confíes y revisa primero el
+  código del campo `source`.** El entorno aislado limita lo que puede hacer el código
+  importado, pero no garantiza que sea seguro, correcto o rentable. Las estrategias
+  de terceros no están escritas ni verificadas por el autor, que no se
+  responsabiliza de ellas.
 - Referencia completa: botón **📘 Strategy docs** (en EN/RU/ES).
 
 ---
@@ -320,6 +325,12 @@ real. Sin todo eso, nunca se envía ninguna orden.
   `TRADEMARKS.md`.
 - El software se ofrece "tal cual", **sin garantía**; **no es asesoramiento de
   inversión**. Operar es bajo tu propio riesgo.
+- **Las estrategias importadas (`.rwd.json`) son código de terceros**, no escritas
+  ni verificadas por el autor — importa solo de fuentes de confianza y revisa el
+  campo `source` antes de ejecutar. El autor no se responsabiliza de las estrategias
+  de terceros ni de las pérdidas que causen. A medida que crezca la base de
+  usuarios, analiza las estrategias importadas en busca de inyecciones maliciosas
+  o virales.
 
 ---
 

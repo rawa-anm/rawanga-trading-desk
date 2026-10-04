@@ -499,6 +499,15 @@ The file is plain JSON with this structure:
 > shared file can never execute anything unsafe. Only the `source` field matters
 > for the logic — the other fields are metadata.
 
+> ⚠️ **Importing third-party strategies carries risk — import only from sources you
+> trust.** The sandbox blocks direct system, file and network access, but it cannot
+> judge intent: a shared strategy can still be flawed, misleading, or abuse the
+> computation it is allowed to perform. **Always review the `source` code before
+> importing**, and treat every imported `.rwd.json` as untrusted input. The author
+> does not write or review third-party strategies and is not responsible for them or
+> for any losses they cause. As the user base grows, scan imported strategies for
+> malicious or viral injections before running them.
+
 ---
 
 ## 9. Compiling
@@ -665,6 +674,13 @@ entry('short', crossunder(close, lower))
 The software is provided “as is”, without warranty of any kind. Past performance
 does not guarantee future results. Always test your strategies and never risk more
 than you can afford to lose.
+
+**Third-party strategies are your responsibility.** Strategies you import from
+others (`.rwd.json`) are not written, reviewed or vetted by the author. Import only
+from trusted sources and inspect the `source` code first: the sandbox limits what
+imported code can do, but it does not guarantee that it is safe, correct or
+profitable. The author is not liable for third-party strategies or any damage and
+losses caused by importing or running them.
 
 ---
 
