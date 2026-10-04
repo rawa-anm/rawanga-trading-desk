@@ -499,9 +499,12 @@ El archivo es JSON plano con esta estructura:
 4. El destinatario pulsa **Import**, selecciona el archivo — listo. La estrategia
    aparece en su lista, lista para ejecutar.
 
-> La máquina del destinatario revalida el código en el mismo entorno aislado, así que
-> un archivo compartido nunca puede ejecutar nada inseguro. Para la lógica solo
-> importa el campo `source` — los demás campos son metadatos.
+> La máquina del destinatario revalida el código en el mismo entorno aislado, que
+> bloquea `import`/`eval`/`exec` y el acceso a archivos y red — así que un archivo
+> compartido no puede ejecutar código de sistema arbitrario. Eso limita lo que puede
+> hacer una estrategia, pero **no** garantiza la seguridad (ver la advertencia
+> abajo). Para la lógica solo importa el campo `source` — los demás campos son
+> metadatos.
 
 > ⚠️ **Importar estrategias de terceros conlleva riesgo: importa solo de fuentes en
 > las que confíes.** El entorno aislado bloquea el acceso directo al sistema, a los

@@ -495,9 +495,11 @@ The file is plain JSON with this structure:
 4. The recipient clicks **Import**, selects the file — done. The strategy appears
    in their list, ready to run.
 
-> The recipient's machine re-validates the code through the same sandbox, so a
-> shared file can never execute anything unsafe. Only the `source` field matters
-> for the logic — the other fields are metadata.
+> The recipient's machine re-validates the code through the same sandbox, which
+> blocks `import`/`eval`/`exec` and file or network access — so a shared file cannot
+> run arbitrary system code. That limits what a strategy can do, but it is **not** a
+> guarantee of safety (see the warning below). Only the `source` field matters for
+> the logic — the other fields are metadata.
 
 > ⚠️ **Importing third-party strategies carries risk — import only from sources you
 > trust.** The sandbox blocks direct system, file and network access, but it cannot
