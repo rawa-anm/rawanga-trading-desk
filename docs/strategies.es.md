@@ -545,6 +545,11 @@ Notas:
   arrancar.
 - Puedes eliminar una estrategia compilada de la lista de guardadas.
 
+> ℹ️ **Nota sobre la estrategia integrada `rawa_system` (ADX).** El indicador ADX
+> está presente en el código de la estrategia pero **no se utiliza**. Vigila la
+> tendencia general del mercado manualmente y no operes con esta estrategia en baja
+> volatilidad.
+
 ---
 
 ## 10. Errores comunes y consejos

@@ -177,7 +177,8 @@ async def set_trend_state(symbol: str, tf: str, side: str, flip_ts: int):
 
 
 def format_signal(sig: dict, symbol: str, tf: str, strategy_title: str,
-                  trade: dict | None = None) -> str:
+                  trade: dict | None = None, fallback: bool = False,
+                  fallback_src: str | None = None) -> str:
     """Trade notification.
 
     Entry: side, entry price, stop (or a trailing marker), TP if present.
@@ -220,6 +221,9 @@ def format_signal(sig: dict, symbol: str, tf: str, strategy_title: str,
             lines.append(f"P/L: {emo} {pl_pct:+.2f}%")
         lines.append(f"time: {sent_dt} UTC")
         lines.append(f"bar: {dt} UTC")
+        if fallback:
+            lines.append(f"⚠️ data not from BingX (source: {fallback_src or 'fallback'})"
+                         " — decision from fallback")
         return "\n".join(lines)
 
     # ── ENTRY ──
@@ -239,6 +243,9 @@ def format_signal(sig: dict, symbol: str, tf: str, strategy_title: str,
         lines.append(f"volume: {vs}/5 {'▮' * int(vs)}{'▯' * (5 - int(vs))}")
     lines.append(f"time: {sent_dt} UTC")
     lines.append(f"bar: {dt} UTC")
+    if fallback:
+        lines.append(f"⚠️ data not from BingX (source: {fallback_src or 'fallback'})"
+                     " — decision from fallback")
     return "\n".join(lines)
 
 

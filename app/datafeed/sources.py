@@ -209,10 +209,82 @@ async def _yahoo(client, ysym, tf, limit):
 
 # ── Core: fetch with cascade ──────────────────────────────────────────
 
+# ── Retries and source guard (Creator's requirement, 2026-10-15) ──
+# How many times we hit a SINGLE exchange before falling back: 3 tries × 5 s.
+RETRY_TRIES = 3
+RETRY_DELAY = 5.0
+# Exchange cooldown: after a FULL failure (transport/5xx/429) we do not hammer it
+# 3×5 s for every ticker — otherwise a global outage stretches one tick (≈85
+# instruments) into minutes. While cooling down — one quick attempt per ticker.
+_SRC_COOLDOWN: dict[str, float] = {}
+_COOLDOWN_SEC = 60.0
+
+
+def _retry_after(e) -> float | None:
+    """Retry-After from the response (429), if present (≤10 s)."""
+    resp = getattr(e, "response", None)
+    if resp is not None:
+        ra = resp.headers.get("Retry-After")
+        if ra:
+            try:
+                return min(float(ra), 10.0)
+            except Exception:  # noqa: BLE001
+                return None
+    return None
+
+
+def _is_global_err(e) -> bool:
+    """Does it look like a WHOLE-exchange failure (network/5xx/429)?"""
+    if isinstance(e, (httpx.TransportError, httpx.TimeoutException)):
+        return True
+    resp = getattr(e, "response", None)
+    if resp is not None and (resp.status_code == 429 or resp.status_code >= 500):
+        return True
+    return False
+
+
+async def _retry_fetch(fn, client, arg, tf, limit, name,
+                       tries: int = RETRY_TRIES, delay: float = RETRY_DELAY):
+    """Repeated requests to a SINGLE exchange. Returns bars or None.
+
+    During a global outage (cooldown) — a single quick attempt, no delays.
+    """
+    now = time.time()
+    cooling = _SRC_COOLDOWN.get(name, 0) > now
+    attempts = 1 if cooling else tries
+    last_err = None
+    for i in range(1, attempts + 1):
+        try:
+            bars = await fn(client, arg, tf, limit)
+            if bars:
+                _SRC_COOLDOWN.pop(name, None)
+                return bars
+            last_err = "empty"
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            ra = _retry_after(e)
+            if ra:
+                await asyncio.sleep(ra)
+                continue
+        if i < attempts:
+            await asyncio.sleep(delay)
+    if not cooling:
+        _SRC_COOLDOWN[name] = now + _COOLDOWN_SEC
+        log.warning("fetch %s %s <- %s: %d attempts failed (%s); cooldown %.0fs",
+                    arg, tf, name, attempts, last_err, _COOLDOWN_SEC)
+    return None
+
+
 async def fetch_ohlcv(symbol: str, tf: str, limit: int = 500,
                       client: httpx.AsyncClient | None = None,
                       kind: str = "crypto") -> dict:
-    """Returns {'symbol','tf','source','bars':[[ts,o,h,l,c,v],...]}."""
+    """Returns {'symbol','tf','source','bars':[[ts,o,h,l,c,v],...]}.
+
+    Cascade: BingX → Binance → Bybit → OKX (crypto). EACH source is queried
+    with retries 3×5 s (_retry_fetch): BingX is hammered first, and only if it
+    does not answer after the retries do we fall back. The `source` in the reply
+    shows which exchange the bar actually came from (for the webhook marker).
+    """
     if tf not in TF_MAP:
         raise SourceError(f"unsupported tf {tf}")
     own = client is None
@@ -228,19 +300,11 @@ async def fetch_ohlcv(symbol: str, tf: str, limit: int = 500,
             sources = [("yahoo", _yahoo)]
         for name, fn in sources:
             arg = symbol if name == "yahoo" else symbol.upper()
-            for attempt in range(2):
-                try:
-                    bars = await fn(client, arg, tf, limit)
-                    if bars:
-                        log.info("fetch %s %s <- %s (%d bars)", symbol, tf, name, len(bars))
-                        return {"symbol": symbol, "tf": tf, "source": name, "bars": bars}
-                    raise SourceError("empty")
-                except Exception as e:  # noqa: BLE001
-                    errors.append(f"{name}: {e}")
-                    if "429" in str(e):
-                        await asyncio.sleep(1.5)
-                        continue
-                    break
+            bars = await _retry_fetch(fn, client, arg, tf, limit, name)
+            if bars:
+                log.info("fetch %s %s <- %s (%d bars)", symbol, tf, name, len(bars))
+                return {"symbol": symbol, "tf": tf, "source": name, "bars": bars}
+            errors.append(f"{name}: failed")
         raise SourceError("all sources failed: " + " | ".join(errors[-4:]))
     finally:
         if own:

@@ -538,6 +538,10 @@ Notes:
 - Compiled strategies are persisted and re-registered automatically on startup.
 - You can delete a compiled strategy from the list of saved strategies.
 
+> ℹ️ **Note on the built-in `rawa_system` strategy (ADX).** The ADX indicator is
+> present in the strategy code but is **not used**. Watch the overall market trend
+> manually, and do not trade this strategy in low volatility.
+
 ---
 
 ## 10. Common mistakes and tips

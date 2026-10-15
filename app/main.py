@@ -262,9 +262,14 @@ async def trend(symbol: str, tf: str = "1h", limit: int = 500,
             "flips": flips, "last": flips[-1] if flips else None}
 
 
+# Trade-journal depth (candles). Was 500 (~20 days on 1h) — profitable trades
+# fell out of the sliding window and the journal showed a loss. Now 3000 candles.
+JOURNAL_DEPTH = 3000
+
+
 @app.get("/api/trades/{symbol}")
 async def trades_endpoint(symbol: str, strategy: str = "stv3", tf: str = "1h",
-                         limit: int = 500, period: str = "all"):
+                         limit: int = JOURNAL_DEPTH, period: str = "all"):
     """Trade journal for an instrument + P/L statistics for the period."""
     try:
         meta = await _resolve(symbol)

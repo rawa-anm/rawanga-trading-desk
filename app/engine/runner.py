@@ -78,15 +78,25 @@ async def _email_alert(text: str, subject: str) -> bool:
 
 
 async def _bars(client, meta, tf, limit=500):
-    """Fetch fresh bars: live (via the cascade) → cache."""
+    """Fetch fresh bars: BingX (retries 3×5 s) → fallback → cache.
+
+    Returns (bars, from_bingx, source). from_bingx=False — the data is NOT from
+    BingX (BingX did not answer after the retries → fallback/cache): we still
+    trade, but mark the source in the webhook message.
+    """
+    src = None
     try:
         res = await fetch_ohlcv(meta["yahoo"] if meta["kind"] != "crypto" else meta["symbol"],
                                 tf, limit, client=client, kind=meta["kind"])
         if res["bars"]:
             await cache.upsert_bars(meta["symbol"], tf, res["bars"], res["source"])
+            src = res["source"]
     except Exception as e:  # noqa: BLE001
         log.debug("live fetch failed %s %s: %s -> cache", meta["symbol"], tf, e)
-    return await cache.get_bars(meta["symbol"], tf, limit)
+    bars = await cache.get_bars(meta["symbol"], tf, limit)
+    # for crypto BingX is the primary source; not-bingx = fallback/cache
+    from_bingx = (src == "bingx") if meta.get("kind") == "crypto" else True
+    return bars, from_bingx, src
 
 
 async def run_trade_strategies(client, state, only_tfs=None, prime_only=False) -> int:
@@ -106,7 +116,7 @@ async def run_trade_strategies(client, state, only_tfs=None, prime_only=False) -
     tfs = [tf for tf in TFS if (only_tfs is None or tf in only_tfs)]
     for meta in trade_rows:
         for tf in tfs:
-            bars = await _bars(client, meta, tf)
+            bars, from_bingx, data_src = await _bars(client, meta, tf)
             if len(bars) < 30:
                 continue
             d0 = eng._df(bars)  # noqa: SLF001 — shared converter
@@ -167,6 +177,10 @@ async def run_trade_strategies(client, state, only_tfs=None, prime_only=False) -
                     # Persistent dedup (signals_sent strategy="exec"): a service
                     # restart must NOT duplicate a real order.
                     exec_side = "exec:" + deal["kind"] + ":" + str(deal["side"])
+                    # fallback = the bar data is NOT from BingX (BingX did not answer
+                    # after the 3×5 s retries → fallback/cache): we still execute,
+                    # but mark the source in the webhook message.
+                    fallback = not from_bingx
                     if not await store.already_sent("exec", meta["symbol"], tf,
                                                     deal["ts"], exec_side):
                         st = None
@@ -184,7 +198,8 @@ async def run_trade_strategies(client, state, only_tfs=None, prime_only=False) -
                     # match the entry and exit for the exit signal (the same trade!)
                     sig = _deal_sig(deal)
                     text = wh.format_signal(sig, meta["symbol"], tf,
-                                            STRATEGIES[strat]["title"], trade=deal["trade"])
+                                            STRATEGIES[strat]["title"], trade=deal["trade"],
+                                            fallback=fallback, fallback_src=data_src)
                     ok = False
                     # ── Route from the webhook registry. A webhook is the GATE
                     # of delivery: no enabled hook for symbol×TF×strategy →
@@ -251,7 +266,7 @@ async def run_trend(client, state, only_tfs=None, prime_only=False) -> int:
         meta = await store.get(sym)
         if not meta:
             continue
-        bars = await _bars(client, meta, tf)
+        bars, _, _ = await _bars(client, meta, tf)
         if len(bars) < 30:
             continue
         # Parameters — the same as in the standard implementation: Supertrend (10, hl2, 3)
