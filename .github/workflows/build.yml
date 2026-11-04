@@ -75,6 +75,10 @@ jobs:
       - name: Release notes from the tag annotation
         id: notes
         run: |
+          # checkout приносит тег как облегчённый (указатель на коммит), и
+          # %(contents) тогда отдаёт сообщение КОММИТА, а не аннотацию тега.
+          # Забираем сам объект тега явно.
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
           git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > release_notes.md
           echo "--- начало описания ---"
           head -5 release_notes.md
