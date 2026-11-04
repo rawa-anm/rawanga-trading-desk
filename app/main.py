@@ -413,7 +413,9 @@ async def docs(lang: str = "en"):
 
 
 # ── Strategy editor (Python): validate → compile → register ──
-STRAT_DYN = ROOT / "state" / "strategies.json"
+# User strategies are USER DATA — they live in the data directory, not next to
+# the program (a frozen build may sit in a read-only folder).
+STRAT_DYN = _paths.DATA_DIR / "strategies.json"
 
 
 def _strat_load_json() -> dict:

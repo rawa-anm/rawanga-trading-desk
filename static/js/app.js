@@ -468,7 +468,8 @@ async function loadInstruments() {
       const d = document.createElement('div');
       d.className = 'inst' + (it.symbol === current.symbol ? ' active' : '');
       d.dataset.symbol = it.symbol;
-      d.innerHTML = `<span class="sym">${it.symbol}</span><span><span class="px" data-px="${it.symbol}">—</span> <span class="del" title="${t('misc.delete')}">✕</span></span>`;
+      const _s = esc(it.symbol);
+      d.innerHTML = `<span class="sym">${_s}</span><span><span class="px" data-px="${_s}">—</span> <span class="del" title="${t('misc.delete')}">✕</span></span>`;
       d.onclick = (e) => { if (e.target.classList.contains('del')) return; selectSymbol(it.symbol); };
       d.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeInstrument(it.symbol); };
       list.appendChild(d);
@@ -610,7 +611,7 @@ function webhookRow(w) {
 }
 
 function startEditWebhook(d, w) {
-  const opts = whStrategies.map(s => `<option value="${s.key}" ${s.key === w.strategy ? 'selected' : ''}>${s.title}</option>`).join('');
+  const opts = whStrategies.map(s => `<option value="${esc(s.key)}" ${s.key === w.strategy ? 'selected' : ''}>${esc(s.title)}</option>`).join('');
   const tfV = w.tf || '*';
   d.innerHTML = `<div class="whedit">
     <label>${t('wh.strategy')}<select class="e-strategy">${opts}</select></label>
@@ -684,7 +685,8 @@ async function refreshPrice(it) {
     const r = await fetch(`${API}/api/bars/${it.symbol}?tf=15m&limit=2&refresh=false`);
     const j = await r.json();
     const last = j.bars[j.bars.length - 1];
-    document.querySelectorAll(`[data-px="${it.symbol}"]`).forEach(e => {
+    const _sel = (window.CSS && CSS.escape) ? CSS.escape(it.symbol) : it.symbol.replace(/["\\]/g, '\\$&');
+    document.querySelectorAll(`[data-px="${_sel}"]`).forEach(e => {
       e.textContent = last ? last.c.toFixed(last.c >= 100 ? 2 : 4) : '—';
     });
   } catch (e) {}
@@ -710,7 +712,8 @@ async function openJournal(sym) {
   } catch (e) {
     // a journal render failure must not break the panel
     console.error('journal error:', e);
-    el.innerHTML = `<h2>${t('journal.title', { sym: sym })} <span class="cls" onclick="closeJournal()">✕</span></h2>`
+    const _js = esc(sym);
+    el.innerHTML = `<h2>${t('journal.title', { sym: _js })} <span class="cls" onclick="closeJournal()">✕</span></h2>`
       + `<div class="jtrade"><span></span><span class="pxs">${t('journal.loadErr')}</span><span></span></div>`;
   }
 }
@@ -721,7 +724,7 @@ function renderJournal(sym, j) {
   const plCls = (s.pl_pct_sum || 0) >= 0 ? 'pos' : 'neg';
   const plTxt = (s.pl_pct_sum == null ? '—' : (s.pl_pct_sum >= 0 ? '+' : '') + s.pl_pct_sum.toFixed(2) + '%');
   const periods = ['current_month', 'month', 'year', 'all'].map(k => [k, t('period.' + k)]);
-  let html = `<h2>${t('journal.title', { sym: sym })} <span class="cls" onclick="closeJournal()">✕</span></h2>`;
+  let html = `<h2>${t('journal.title', { sym: esc(sym) })} <span class="cls" onclick="closeJournal()">✕</span></h2>`;
   html += `<div class="jsum">
     <div class="big ${plCls}" style="color:var(--${plCls === 'pos' ? 'up' : 'dn'})">${plTxt}</div>
     <div class="rowline"><span>${t('journal.plPeriod')}</span><span>${t('journal.trades', { n: s.count })}</span></div>
@@ -1275,11 +1278,11 @@ async function openTickers() {
   sel.innerHTML = `<option value="">${t('misc.loadingOpt')}</option>`;
   const r = await fetch(`${API}/api/trade/available`);
   const j = await r.json().catch(() => ({}));
-  if (j.detail) { sel.innerHTML = `<option value="">${j.detail}</option>`; return; }
+  if (j.detail) { sel.innerHTML = `<option value="">${esc(j.detail)}</option>`; return; }
   const cur = new Set(tkCache.map(t => t.symbol));
   const opts = (j.available || []).filter(x => x.available && !cur.has(x.symbol));
   sel.innerHTML = `<option value="">${t('tickers.choose')}</option>` +
-    opts.map(x => `<option value="${x.symbol}">${x.symbol} · ${x.bingx_symbol}</option>`).join('');
+    opts.map(x => `<option value="${esc(x.symbol)}">${esc(x.symbol)} · ${esc(x.bingx_symbol)}</option>`).join('');
   openModal('modalTickers');
 }
 
@@ -1294,7 +1297,7 @@ async function refreshTkList() {
   tkCache.forEach(t => {
     const d = document.createElement('div');
     d.className = 'tk' + (t.enabled ? '' : ' off');
-    d.innerHTML = `<span>${t.enabled ? '✅' : '⛔'} <b>${t.symbol}</b> · ${t.bingx_symbol} · ${t.category || ''}</span>`;
+    d.innerHTML = `<span>${t.enabled ? '✅' : '⛔'} <b>${esc(t.symbol)}</b> · ${esc(t.bingx_symbol)} · ${esc(t.category || '')}</span>`;
     const box = document.createElement('span');
     const tg = document.createElement('span'); tg.className = 'icn'; tg.textContent = t.enabled ? '⏸' : '▶'; tg.title = t2('tickers.toggle');
     tg.onclick = async () => { await fetch(`${API}/api/trade/tickers/${t.symbol}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !t.enabled }) }); refreshTkList(); };

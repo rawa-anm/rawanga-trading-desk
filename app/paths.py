@@ -70,6 +70,16 @@ def _default_data_dir() -> Path:
 DATA_DIR = _default_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+# The data directory holds encrypted exchange keys and their master keys.
+# Restrict it to the owning user: 0700, not the 0755 a plain mkdir leaves behind.
+try:
+    import stat as _stat
+    _cur = DATA_DIR.stat().st_mode & 0o777
+    if _cur & 0o077:                      # any group/other access at all
+        os.chmod(DATA_DIR, 0o700)
+except Exception:  # noqa: BLE001
+    pass                                                  # Windows / exotic FS
+
 # Data files.
 DB_PATH = DATA_DIR / "tv.db"
 SECRETS_PATH = DATA_DIR / "bx_secrets.enc"
