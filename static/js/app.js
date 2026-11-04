@@ -68,7 +68,9 @@ function initChart() {
     handleScale: { axisPressedMouseMove: { price: true, time: true }, mouseWheel: true },
     crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
   });
-  chart.timeScale().applyOptions({ rightOffset: 4 });
+  // Candle width. fitContent() squeezed 500 bars down to barSpacing ~2.4 px.
+  // 24 -> 16 -> 12 px; rightOffset (empty bars to the price scale) 30 -> 20.
+  chart.timeScale().applyOptions({ barSpacing: 12, rightOffset: 20 });
   initMainSync();
   const c = themeColor();
   candleSeries = chart.addCandlestickSeries({
@@ -210,13 +212,18 @@ async function loadIndicators() {
     indLine.st = seriesFrom(j.supertrend, t, '#ff9800', 2);
   }
   if (show('i-don')) {
-    indLine.donH = seriesFrom(j.donchian_hi, t, '#26a69a', 1, 2);
-    indLine.donL = seriesFrom(j.donchian_lo, t, '#ef5350', 1, 2);
+    // Donchian: width 1 + dashed + dull colours got lost against the candles.
+    // Now width 2 solid, saturated — the channel must be readable at a glance.
+    indLine.donH = seriesFrom(j.donchian_hi, t, '#00e676', 2, 0);
+    indLine.donL = seriesFrom(j.donchian_lo, t, '#ff5252', 2, 0);
   }
   if (show('i-bb')) {
-    indLine.bbU = seriesFrom(j.bb_upper, t, 'rgba(120,144,240,0.7)');
-    indLine.bbM = seriesFrom(j.bb_mid, t, 'rgba(120,144,240,0.4)');
-    indLine.bbL = seriesFrom(j.bb_lower, t, 'rgba(120,144,240,0.7)');
+    // Bollinger: 0.7/0.4 alpha was nearly invisible on the dark theme.
+    // Brighter and wider; the middle band is dashed so it is not mistaken
+    // for an outer band.
+    indLine.bbU = seriesFrom(j.bb_upper, t, '#7c9cff', 2, 0);
+    indLine.bbM = seriesFrom(j.bb_mid, t, '#b0b8d8', 1, 2);
+    indLine.bbL = seriesFrom(j.bb_lower, t, '#7c9cff', 2, 0);
   }
   if (show('i-vma')) indLine.vma = seriesFrom(j.vol_ma20, t, '#f0b90b', 1, 0, 'vol');
   // Oscillators — separate mini-charts below the main chart
@@ -224,6 +231,7 @@ async function loadIndicators() {
   renderOsc('macd', j, t, show('i-macd'));
   renderOsc('adx', j, t, show('i-adx'));
   await loadSignals();
+  await loadLevels();
 }
 
 // ── Separate oscillator panes below the main chart ──────────────────
@@ -405,6 +413,64 @@ async function loadSignals() {
   }
 }
 
+// ── Strategy levels (entry / reversal / stop) ───────
+// Show WHERE the strategy will open, close or flip — not just where it did.
+// Read-only: the same engine that produces signals, nothing is recomputed here.
+let lvlLines = [];
+
+function clearLevelLines() {
+  lvlLines.forEach(l => { try { candleSeries.removePriceLine(l); } catch (e) {} });
+  lvlLines = [];
+}
+
+async function loadLevels() {
+  clearLevelLines();
+  const el = document.getElementById('lvlcapt');
+  if (el) el.textContent = '';
+  if (!document.getElementById('i-lvl')?.checked) return;
+  const { symbol, tf, strategy } = current;
+  try {
+    const r = await fetch(`${API}/api/levels/${symbol}?strategy=${strategy}&tf=${tf}&limit=500`);
+    if (!r.ok) return;
+    const j = await r.json();
+    const add = (price, color, title, style) => {
+      if (price == null || !isFinite(price)) return;
+      lvlLines.push(candleSeries.createPriceLine({
+        price: +price, color, lineWidth: 2, lineStyle: style,
+        axisLabelVisible: true, title,
+      }));
+    };
+    if (j.kind === 'donchian') {
+      // Break upward = possible LONG, break downward = possible SHORT
+      add(j.entry_long, '#00e676', t('lvl.long'), LightweightCharts.LineStyle.Dashed);
+      add(j.entry_short, '#ff5252', t('lvl.short'), LightweightCharts.LineStyle.Dashed);
+    } else if (j.kind === 'supertrend') {
+      const col = (j.close_price >= j.entry_long) ? '#00e676' : '#ff5252';
+      add(j.entry_long, col, t('lvl.flip'), LightweightCharts.LineStyle.Dashed);
+    }
+    // Stop of the open position — solid and bright: this is the risk level
+    if (j.stop != null) add(j.stop, '#ff9100', t('lvl.stop'), LightweightCharts.LineStyle.Solid);
+    window._lvlInfo = j;
+    updateLvlCaption(j);
+  } catch (e) { /* levels are not critical for trading */ }
+}
+
+function updateLvlCaption(j) {
+  const el = document.getElementById('lvlcapt');
+  if (!el || !j) return;
+  const f = v => (v == null ? '—' : (Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(4)));
+  const parts = [];
+  if (j.kind === 'donchian') {
+    parts.push(`${t('lvl.capLong')} ${f(j.entry_long)}`, `${t('lvl.capShort')} ${f(j.entry_short)}`);
+  } else if (j.kind === 'supertrend') {
+    parts.push(`${t('lvl.capFlip')} ${f(j.entry_long)}`);
+  }
+  if (j.stop != null) parts.push(`${t('lvl.capStop')} ${f(j.stop)}`);
+  if (j.side) parts.push(`${t('lvl.capPos')} ${j.side.toUpperCase()}`);
+  el.textContent = parts.join(' · ');
+  el.title = j.note || '';
+}
+
 // ── Dotted trade lines (entry→exit) ────────────────
 let tradeLines = [];
 let journalTrades = [];
@@ -469,13 +535,35 @@ async function loadInstruments() {
       d.className = 'inst' + (it.symbol === current.symbol ? ' active' : '');
       d.dataset.symbol = it.symbol;
       const _s = esc(it.symbol);
-      d.innerHTML = `<span class="sym">${_s}</span><span><span class="px" data-px="${_s}">—</span> <span class="del" title="${t('misc.delete')}">✕</span></span>`;
+      d.innerHTML = `<span class="sym">${_s}</span><span class="rgt"><span class="px" data-px="${_s}">—</span>`
+        + `<span class="chg zero" data-chg="${_s}">—</span>`
+        + `<span class="del" title="${t('misc.delete')}">✕</span></span>`;
       d.onclick = (e) => { if (e.target.classList.contains('del')) return; selectSymbol(it.symbol); };
       d.querySelector('.del').onclick = (e) => { e.stopPropagation(); removeInstrument(it.symbol); };
       list.appendChild(d);
     }
   }
   instruments.forEach(i => refreshPrice(i));
+  loadChanges24();
+}
+
+// 24h change, % — for the column in the instrument list.
+// Crypto comes from one batch ticker request; everything else falls through to
+// the local daily cache. Read-only, trading logic is not touched.
+async function loadChanges24() {
+  try {
+    const r = await fetch(`${API}/api/change24`);
+    const j = await r.json();
+    const ch = j.changes || {};
+    document.querySelectorAll('[data-chg]').forEach(e => {
+      const v = ch[e.dataset.chg];
+      if (!v || v.pct == null) { e.textContent = '—'; e.className = 'chg zero'; return; }
+      const p = +v.pct;
+      e.textContent = (p > 0 ? '+' : '') + p.toFixed(2) + '%';
+      e.className = 'chg ' + (p > 0 ? 'pos' : p < 0 ? 'neg' : 'zero');
+      e.title = t('misc.src') + ': ' + (v.src || '—');
+    });
+  } catch (e) { /* the column is not critical for trading */ }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -833,7 +921,7 @@ async function loadStrategies() {
     sel.appendChild(o);
   });
   sel.value = current.strategy;
-  sel.onchange = () => { current.strategy = sel.value; loadSignals(); };
+  sel.onchange = () => { current.strategy = sel.value; loadSignals(); loadLevels(); };
 }
 
 // ── Strategy editor (Python) ───────────────────────────────
@@ -1143,6 +1231,16 @@ function syncExchangePanes(name) {
   if (sw) sw.style.display = (name !== _curExchange) ? 'block' : 'none';
 }
 
+// Exchange selector: show that exchange's key pane and warn about a real switch.
+// Reading another exchange's keys and trading on it are different things: you can
+// look at HL keys without moving execution there.
+function onExchangeChange() {
+  const sel = document.getElementById('trExchange');
+  if (!sel) return;
+  const want = sel.value;
+  syncExchangePanes(want);
+}
+
 // Hyperliquid connection check — read-only, no orders.
 async function testHl() {
   const el = document.getElementById('trHlResult');
@@ -1333,8 +1431,12 @@ window.onLangChange = () => {
   await loadInstruments();
   await loadStrategies();
   await loadBars(true);
+  // The journal is a permanent panel: fill it for the default symbol instead
+  // of leaving it empty until the first click.
+  await openJournal(current.symbol);
+  setInterval(loadChanges24, 60000);
   // indicator toggles
-  ['i-vma','i-ema','i-st','i-don','i-bb','i-rsi','i-macd','i-adx','i-sma50','i-sma200'].forEach(id => {
+  ['i-vma','i-ema','i-st','i-don','i-bb','i-rsi','i-macd','i-adx','i-sma50','i-sma200','i-lvl'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', loadIndicators);
   });

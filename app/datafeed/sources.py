@@ -26,6 +26,7 @@ import json
 import logging
 from pathlib import Path
 import time
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -111,8 +112,175 @@ async def _okx(client, sym, tf, limit):
     return sorted(out, key=lambda x: x[0])
 
 
-CRYPTO_SOURCES = [("bingx", _bingx), ("binance", _binance),
-                  ("bybit", _bybit), ("okx", _okx)]
+# ── Hyperliquid (public info endpoint, NO keys, NO signing) ───────────
+HL_INFO = "https://api.hyperliquid.xyz/info"
+# HL intervals. 1w/1M are deliberately absent: their grid is not calendar
+# based (a week starts on THURSDAY, a "month" is exactly 30 days). We take 1d
+# and cut it ourselves, otherwise the grid drifts away from every other source.
+HL_TF = {"15m": "15m", "1h": "1h", "4h": "4h", "1d": "1d"}
+
+# Coins listed on HL under a x1000 lot ticker.
+HL_ALIAS = {"PEPE": "kPEPE", "SHIB": "kSHIB", "BONK": "kBONK",
+            "FLOKI": "kFLOKI", "LUNC": "kLUNC", "NEIRO": "kNEIRO",
+            "DOGS": "kDOGS",
+            # KPEPE is an instrument IN k-units already: on HL the coin is
+            # called kPEPE, but no 1:1000 rescale applies — it IS the k-denominal.
+            "KPEPE": "kPEPE"}
+# (price factor, volume factor) for k-coins.
+# kPEPE = 1000 PEPE: the price is 1000x BIGGER, so divide price and multiply
+# volume. Without this vol_ma drifts by 1000x and vol_score starts lying.
+HL_SCALE = {c: (1e-3, 1e3) for c in HL_ALIAS.values()}
+# Instruments that are k-denominated by themselves: leave price/volume alone,
+# otherwise KPEPE collapses into PEPE and the two rows become duplicates.
+HL_KEEP_UNITS = {"KPEPE"}
+
+# ── Tickers that exchanges call differently ───────────────────────────
+# Verified against the APIs on 2026-11-03:
+#   BingX:  PEPE -> 1000PEPE-USDT (x1000 lot; no plain PEPE pair)
+#           GRAM -> GRAMTON-USDT   (same asset, different ticker name)
+#   Bybit:  PEPE -> 1000PEPEUSDT
+#   OKX:    PEPE -> PEPE-USDT      (plain PEPE, ordinary units)
+#   Binance:PEPE -> PEPEUSDT       (ordinary units)
+# Without renaming, BingX returns an EMPTY list and the instrument silently
+# falls through to a foreign exchange — price and volume then come from a
+# different venue than the one executing the trade.
+SRC_ALIAS = {
+    "bingx": {"PEPE": "1000PEPE", "GRAM": "GRAMTON", "KPEPE": "1000PEPE"},
+    "bybit": {"PEPE": "1000PEPE"},
+}
+
+# Multipliers (price, volume) for lots quoted in other units.
+# 1000PEPE = 1000 PEPE: price is 1000x bigger, volume 1000x smaller.
+# GRAM (GRAMTON) is the same asset 1:1 — no multiplier.
+SRC_SCALE = {
+    ("bingx", "PEPE"): (1e-3, 1e3),
+    ("bybit", "PEPE"): (1e-3, 1e3),
+}
+
+# Instruments whose PRIMARY source is pinned regardless of `prefer`:
+# KPEPE only exists in k-units on Hyperliquid, so verification has to happen there.
+PRIMARY_SOURCE = {"KPEPE": "hyperliquid"}
+
+
+def _src_ticker(src_name: str, symbol: str) -> str:
+    """Ticker of an instrument on a specific exchange (with renames applied)."""
+    s = symbol.upper()
+    return SRC_ALIAS.get(src_name, {}).get(s, s)
+
+
+def _apply_src_scale(bars: list, src_name: str, symbol: str) -> list:
+    """Convert x1000-lot bars (1000PEPE) back to ordinary units."""
+    pmul, vmul = SRC_SCALE.get((src_name, symbol.upper()), (1.0, 1.0))
+    if pmul == 1.0 and vmul == 1.0:
+        return bars
+    for b in bars:
+        b[1] *= pmul; b[2] *= pmul; b[3] *= pmul; b[4] *= pmul
+        b[5] *= vmul
+    return bars
+
+
+async def _hyperliquid(client, sym, tf, limit):
+    """Hyperliquid candles via the PUBLIC info endpoint (no keys needed).
+
+    Traps that had to be handled:
+      - one endpoint (POST /info), payload {"type":"candleSnapshot"} — not a REST path;
+      - bars arrive NEWEST FIRST and carry a `t` field instead of being arrays;
+      - 1w/1M on HL are not calendar aligned (week starts THURSDAY, "month" = 30
+        days), so those TFs are built from 1d and cut here — otherwise the grid
+        disagrees with other sources and a bar slides by days;
+      - k-coins (kPEPE and friends) quote x1000: divide price, multiply volume,
+        otherwise vol_ma drifts by 1000x.
+    """
+    coin = HL_ALIAS.get(sym.upper(), sym.upper())
+    if sym.upper() in HL_KEEP_UNITS:
+        pmul, vmul = 1.0, 1.0          # already in k-units
+    else:
+        pmul, vmul = HL_SCALE.get(coin, (1.0, 1.0))
+
+    if tf in HL_TF:
+        iv, out_tf, agg_sec = HL_TF[tf], tf, 0
+        want = limit
+    elif tf == "1w":
+        iv, out_tf, agg_sec = "1d", tf, TF_SECONDS["1w"]
+        want = min(limit * 7 + 7, 5000)
+    elif tf == "1M":
+        iv, out_tf, agg_sec = "1d", tf, TF_SECONDS["1M"]
+        want = min(limit * 31 + 31, 5000)
+    else:
+        raise SourceError(f"hyperliquid: unsupported tf {tf}")
+
+    # Window is derived from the number of bars we need: without startTime HL
+    # returns very few candles.
+    span_ms = want * (TF_SECONDS[iv]) * 1000
+    now = int(time.time() * 1000)
+    r = await client.post(HL_INFO, json={"type": "candleSnapshot", "req": {
+        "coin": coin, "interval": iv,
+        "startTime": now - span_ms, "endTime": now}})
+    r.raise_for_status()
+    rows = r.json()
+    if not isinstance(rows, list):
+        raise SourceError(f"hyperliquid: unexpected payload {str(rows)[:120]}")
+
+    out = [[int(c["t"]), float(c["o"]), float(c["h"]), float(c["l"]),
+            float(c["c"]), float(c.get("v", 0))] for c in rows]
+    if not out:
+        raise SourceError("hyperliquid: empty")
+    out.sort(key=lambda x: x[0])          # HL sends newest first
+
+    if pmul != 1.0 or vmul != 1.0:
+        # kPEPE price is 1000x the real one; volume is 1000x smaller.
+        for b in out:
+            b[1] *= pmul; b[2] *= pmul; b[3] *= pmul; b[4] *= pmul
+            b[5] *= vmul
+
+    if agg_sec:
+        out = _hl_calendar_agg(out, out_tf)
+    return out[-limit:]
+
+
+def _hl_calendar_agg(bars: list[list], tf: str) -> list[list]:
+    """Fold daily HL bars into WEEKLY/MONTHLY buckets by CALENDAR.
+
+    _aggregate_bars cuts at whole intervals since the epoch — correct for
+    15m/1h/4h, but for 1w/1M that yields a 1970-based grid: weeks start on
+    THURSDAY, "months" on the 6th. BingX/Binance cut by calendar: week starts
+    Monday 00:00 UTC, month on the 1st.
+    """
+    buckets: dict[int, list] = {}
+    for b in sorted(bars, key=lambda x: x[0]):
+        dt = datetime.fromtimestamp(b[0] / 1000, timezone.utc)
+        if tf == "1w":
+            k = dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            k = k - timedelta(days=k.weekday())
+        else:  # 1M
+            k = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        ts = int(k.timestamp() * 1000)
+        if ts not in buckets:
+            buckets[ts] = [ts, b[1], b[2], b[3], b[4], b[5]]
+        else:
+            a = buckets[ts]
+            a[2] = max(a[2], b[2])
+            a[3] = min(a[3], b[3])
+            a[4] = b[4]
+            a[5] = (a[5] or 0) + (b[5] or 0)
+    return [buckets[k] for k in sorted(buckets)]
+
+
+CRYPTO_SOURCES = [("bingx", _bingx), ("hyperliquid", _hyperliquid),
+                  ("binance", _binance), ("bybit", _bybit), ("okx", _okx)]
+
+
+def ordered_crypto_sources(prefer: str | None = None) -> list:
+    """Cascade where `prefer` (the executing exchange) comes FIRST.
+
+    The rest stay as a safety net in their original order.
+    """
+    if not prefer:
+        return list(CRYPTO_SOURCES)
+    pref = str(prefer).strip().lower()
+    head = [(n, f) for n, f in CRYPTO_SOURCES if n == pref]
+    tail = [(n, f) for n, f in CRYPTO_SOURCES if n != pref]
+    return head + tail
 
 
 # ── USDT Dominance (synthetic candles from CoinGecko) ───────────────
@@ -277,13 +445,22 @@ async def _retry_fetch(fn, client, arg, tf, limit, name,
 
 async def fetch_ohlcv(symbol: str, tf: str, limit: int = 500,
                       client: httpx.AsyncClient | None = None,
-                      kind: str = "crypto") -> dict:
+                      kind: str = "crypto",
+                      prefer: str | None = None) -> dict:
     """Returns {'symbol','tf','source','bars':[[ts,o,h,l,c,v],...]}.
 
-    Cascade: BingX → Binance → Bybit → OKX (crypto). EACH source is queried
-    with retries 3×5 s (_retry_fetch): BingX is hammered first, and only if it
-    does not answer after the retries do we fall back. The `source` in the reply
-    shows which exchange the bar actually came from (for the webhook marker).
+    Cascade: (prefer) → BingX → Hyperliquid → Binance → Bybit → OKX (crypto).
+    `prefer` is the executing exchange and is queried first. EACH source is
+    tried with retries 3×5 s (_retry_fetch). The `source` in the reply shows
+    which venue the bar actually came from (used for the webhook marker).
+
+    PRIMARY_SOURCE pins the main source rigidly, ignoring `prefer`: some tickers
+    do not exist on the executing exchange under that name (KPEPE only exists in
+    k-units on Hyperliquid).
+
+    Taking the bar from one venue while executing on another is exactly how
+    false arbitrage signals appeared (STRK case): prices differ in tenths of a
+    percent between exchanges and the strategy reads that as a move.
     """
     if tf not in TF_MAP:
         raise SourceError(f"unsupported tf {tf}")
@@ -295,13 +472,21 @@ async def fetch_ohlcv(symbol: str, tf: str, limit: int = 500,
         if kind == "dominance":
             sources = [("dominance", _dominance)]
         elif kind == "crypto":
-            sources = CRYPTO_SOURCES + [("yahoo", _yahoo)]
+            # prefer — the executing exchange goes first.
+            # PRIMARY_SOURCE — a hard pin, it comes first regardless of prefer.
+            pinned = PRIMARY_SOURCE.get(symbol.upper())
+            sources = ordered_crypto_sources(pinned or prefer) + [("yahoo", _yahoo)]
         else:
             sources = [("yahoo", _yahoo)]
         for name, fn in sources:
-            arg = symbol if name == "yahoo" else symbol.upper()
+            if name == "yahoo":
+                arg = symbol
+            else:
+                # The ticker may be named differently on this venue (1000PEPE).
+                arg = _src_ticker(name, symbol)
             bars = await _retry_fetch(fn, client, arg, tf, limit, name)
             if bars:
+                bars = _apply_src_scale(bars, name, symbol)
                 log.info("fetch %s %s <- %s (%d bars)", symbol, tf, name, len(bars))
                 return {"symbol": symbol, "tf": tf, "source": name, "bars": bars}
             errors.append(f"{name}: failed")

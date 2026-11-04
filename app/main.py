@@ -226,8 +226,18 @@ async def bars(symbol: str, tf: str = "1h", limit: int = 500,
     source = "cache"
     if refresh:
         try:
+            # prefer — the executing exchange. Taking the bar from one venue
+            # while executing on another produced false arbitrage signals.
+            _prefer = None
+            if meta["kind"] == "crypto":
+                try:
+                    if await store.is_trade_enabled(meta["symbol"]):
+                        _prefer = broker.active()
+                except Exception:  # noqa: BLE001
+                    _prefer = None
             res = await fetch_ohlcv(meta["yahoo"] if meta["kind"] != "crypto" else meta["symbol"],
-                                    tf, limit, client=app.state.client, kind=meta["kind"])
+                                    tf, limit, client=app.state.client, kind=meta["kind"],
+                                    prefer=_prefer)
             await cache.upsert_bars(meta["symbol"], tf, res["bars"], res["source"])
             source = res["source"]
         except Exception as e:  # noqa: BLE001
@@ -314,6 +324,77 @@ async def sig(symbol: str, strategy: str = "stv3", tf: str = "1h", limit: int = 
             "params_used": params,
             "signals": _sig,
             "trades": built["trades"], "open": built["open"]}
+
+
+@app.get("/api/levels/{symbol}")
+async def levels(symbol: str, strategy: str = "rawa_system", tf: str = "1h",
+                 limit: int = 500):
+    """Trigger levels of the strategy — what has to happen for it to open,
+    close or flip. Read-only: it runs the SAME engine as the signals endpoint,
+    nothing is recomputed with different rules.
+
+    Returns:
+      entry_long  — price above which a LONG becomes possible
+      entry_short — price below which a SHORT becomes possible
+      stop        — current stop of the open position (trailed, if it is)
+      side        — side of the open position, or null
+      kind        — donchian | supertrend (which level this is)
+    """
+    try:
+        meta = await _resolve(symbol)
+    except KeyError:
+        raise HTTPException(404, f"unknown symbol {symbol}")
+    if strategy not in eng.STRATEGIES:
+        raise HTTPException(400, f"unknown strategy {strategy}")
+
+    rows = await cache.get_bars(meta["symbol"], tf, limit)
+    if len(rows) < 3:
+        raise HTTPException(409, "not enough cached bars; call /api/bars first")
+
+    params = await store.get_params(meta["symbol"], tf, strategy)
+    d = eng.run(_df(rows), strategy, params)
+    last = d.iloc[-1]
+
+    side = None
+    stop = None
+    try:
+        sig = eng.signals_only(d, params, meta.get("category", "crypto"))
+        built = tr_trades.build_trades(sig)
+        op = built.get("open")
+        if op:
+            side, stop = op.get("side"), op.get("stop")
+            # trailing moves the stop silently inside a position, so the stop
+            # recorded at entry is stale — current_position knows the live one
+            _pos = eng.current_position(d, params, meta.get("category", "crypto"))
+            if _pos:
+                stop = _pos["stop"]
+    except Exception as e:  # noqa: BLE001
+        log.warning("levels: position calc failed: %s", e)
+
+    out = {"symbol": meta["symbol"], "strategy": strategy, "tf": tf,
+           "side": side, "stop": stop, "entry_long": None,
+           "entry_short": None, "kind": None, "close_price": float(last["c"]),
+           "note": None}
+
+    if strategy == "rawa_system":
+        # Entry: Donchian channel breakout built on the PREVIOUS bar (the rule
+        # is c > don_hi.shift(1)), so shift(1) is the correct level.
+        try:
+            hi_prev = float(d["don_hi"].shift(1).iloc[-1])
+            lo_prev = float(d["don_lo"].shift(1).iloc[-1])
+            out.update(entry_long=hi_prev, entry_short=lo_prev, kind="donchian")
+            out["note"] = "long: break up + volume filter + ADX above threshold"
+        except Exception as e:  # noqa: BLE001
+            log.warning("levels: donchian unavailable: %s", e)
+    elif strategy == "stv3":
+        try:
+            st = float(d["supertrend"].iloc[-1])
+            out.update(entry_long=st, entry_short=st, kind="supertrend")
+            out["note"] = "flip on a Supertrend break"
+        except Exception as e:  # noqa: BLE001
+            log.warning("levels: supertrend unavailable: %s", e)
+
+    return out
 
 
 @app.get("/api/trend/{symbol}")

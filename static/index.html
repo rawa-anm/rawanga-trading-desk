@@ -51,6 +51,9 @@
   .inst.active{background:var(--sel);border-left-color:var(--acc)}
   .inst .sym{font-weight:600}
   .inst .px{color:var(--mut);font-variant-numeric:tabular-nums}
+  .inst .rgt{display:flex;align-items:center;gap:8px}
+  .inst .chg{font-variant-numeric:tabular-nums;font-size:11px;min-width:52px;text-align:right}
+  .inst .chg.pos{color:var(--up)} .inst .chg.neg{color:var(--dn)} .inst .chg.zero{color:var(--mut)}
   #chart{position:relative}
   .hvolcanvas{position:absolute;inset:0;pointer-events:none;z-index:3}
   .tfbar{display:flex;gap:6px;padding:6px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -94,7 +97,7 @@
   .mgrid{font-size:10px;color:var(--mut);margin-top:4px;border-collapse:collapse}
   .mgrid td,.mgrid th{padding:2px 5px;text-align:center}
   .mgrid th{color:#8b95a3}
-  .journal{width:340px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;flex-shrink:0;display:none;flex-direction:column}
+  .journal{width:340px;background:var(--panel);border-left:1px solid var(--line);overflow:auto;flex-shrink:0;display:flex;flex-direction:column}
   .journal.on{display:flex}
   .journal h2{font-size:13px;margin:0;padding:10px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
   .journal .cls{cursor:pointer;color:var(--mut);font-size:15px;padding:0 4px}
@@ -185,6 +188,7 @@
       <label class="on"><input type="checkbox" id="i-st" checked> <span data-i18n="ind.supertrend">Supertrend</span></label>
       <label class="on"><input type="checkbox" id="i-don" checked> <span data-i18n="ind.donchian">Donchian</span></label>
       <label><input type="checkbox" id="i-bb"> <span data-i18n="ind.bollinger">Bollinger</span></label>
+      <label class="on"><input type="checkbox" id="i-lvl" checked> <span data-i18n="ind.levels">Levels / stop</span></label>
       <label><input type="checkbox" id="i-rsi"> RSI</label>
       <label><input type="checkbox" id="i-macd"> MACD</label>
       <label><input type="checkbox" id="i-adx"> ADX</label>
@@ -200,6 +204,7 @@
       <div class="strat"><button onclick="openDocs()" data-i18n="btn.docs">📘 Strategy docs</button></div>
       <span class="badge" style="margin-left:auto" id="sigcapt"></span>
       <span class="badge" style="margin-left:8px" id="srcline"></span>
+      <span class="badge" style="margin-left:8px" id="lvlcapt"></span>
       </div>
       <div class="ibar">
       <span class="strat" style="border-left:none;padding-left:0;margin-left:0" data-i18n="bar.trading">trading:</span>
@@ -259,7 +264,7 @@
 <div class="modal" id="modalTrade"><div class="box">
   <h3 data-i18n="trade.title">Real trading</h3>
   <label data-i18n="trade.exchange">Exchange (exactly one is traded on)</label>
-  <select id="trExchange">
+  <select id="trExchange" onchange="onExchangeChange()">
     <option value="bingx">BingX</option>
     <option value="hyperliquid">Hyperliquid</option>
   </select>

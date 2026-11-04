@@ -45,6 +45,9 @@ INSTRUMENTS = {
     "UNI":  ("crypto", "UNI-USD",  "crypto", "Uniswap"),
     "FET":  ("crypto", "FET-USD",  "crypto", "Artificial Superintelligence"),
     "PEPE": ("crypto", "PEPE-USD", "crypto", "Pepe"),
+    # KPEPE is a SEPARATE instrument in k-units (Hyperliquid's kPEPE).
+    # It must not collapse into PEPE: the two rows would become duplicates.
+    "KPEPE": ("crypto", "KPEPE-USD", "crypto", "Pepe x1000 (Hyperliquid)"),
     "ENS":  ("crypto", "ENS-USD",  "crypto", "Ethereum Name Service"),
     "PUMP": ("crypto", "PUMP-USD", "crypto", "Pump.fun"),
     "TIA":  ("crypto", "TIA-USD",  "crypto", "Celestia"),

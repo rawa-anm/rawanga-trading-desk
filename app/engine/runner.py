@@ -84,19 +84,34 @@ async def _bars(client, meta, tf, limit=500):
     BingX (BingX did not answer after the retries → fallback/cache): we still
     trade, but mark the source in the webhook message.
     """
+    # prefer — the executing exchange, but ONLY for instruments actually traded.
+    # Applying it to everything hammered Hyperliquid's rate limit (429s) and
+    # balance reads started failing; untraded symbols have no false-arbitrage
+    # risk because no trade ever happens on them.
+    prefer = None
+    try:
+        from app import broker as _broker
+        if await store.is_trade_enabled(meta["symbol"]):
+            prefer = _broker.active()
+    except Exception:  # noqa: BLE001
+        prefer = None
     src = None
     try:
         res = await fetch_ohlcv(meta["yahoo"] if meta["kind"] != "crypto" else meta["symbol"],
-                                tf, limit, client=client, kind=meta["kind"])
+                                tf, limit, client=client, kind=meta["kind"], prefer=prefer)
         if res["bars"]:
             await cache.upsert_bars(meta["symbol"], tf, res["bars"], res["source"])
             src = res["source"]
     except Exception as e:  # noqa: BLE001
         log.debug("live fetch failed %s %s: %s -> cache", meta["symbol"], tf, e)
     bars = await cache.get_bars(meta["symbol"], tf, limit)
-    # for crypto BingX is the primary source; not-bingx = fallback/cache
-    from_bingx = (src == "bingx") if meta.get("kind") == "crypto" else True
-    return bars, from_bingx, src
+    # Whatever the executing venue is, a bar from anywhere else is a fallback
+    # and has to be marked as such in the webhook.
+    if meta.get("kind") != "crypto":
+        from_primary = True
+    else:
+        from_primary = (src == prefer) if prefer else (src == "bingx")
+    return bars, from_primary, src
 
 
 async def run_trade_strategies(client, state, only_tfs=None, prime_only=False) -> int:
