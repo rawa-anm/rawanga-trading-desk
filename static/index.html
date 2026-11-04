@@ -16,15 +16,15 @@
 -->
 <html lang="en">
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta charset="utf-8">
 <meta name="theme-color" content="#0e1117">
 <meta name="color-scheme" content="dark light">
 <meta name="description" content="Portable charting, indicator and signal terminal. Runs locally.">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
-<!-- No <meta viewport>: this is a desktop-only layout (there are no responsive
-     breakpoints in the CSS). Adding it would squeeze the fixed-width side
-     panels on a phone instead of switching layouts. -->
+<!-- Mobile: below 1200px (or on a coarse pointer) the layout switches to
+     tabs + a bottom indicator sheet instead of shrinking the fixed panels. -->
 <title>Rawanga Trading Desk</title>
 <style>
   :root{--bg:#0e1117;--panel:#161b22;--line:#232b36;--txt:#d5dae3;--mut:#7d8796;--up:#26a69a;--dn:#ef5350;--acc:#3b82f6;--grid:#1b2129;--hover:#1c2230;--sel:#1e2930;--ctrl:#1e2530;--input:#0e1117}
@@ -149,6 +149,83 @@
   .mdoc hr{border:none;border-top:1px solid var(--line);margin:1em 0}
   .mdoc table{border-collapse:collapse;margin:.6em 0}
   .mdoc th,.mdoc td{border:1px solid var(--line);padding:3px 8px;font-size:12px}
+  /* ══════════ Мобильная раскладка (вариант 2): табы + шит ══════════ */
+  .mtabs{display:none}
+
+  @media (max-width:1400px) and (hover:hover) and (pointer:fine){
+    .right{width:260px}
+    .journal{width:300px}
+  }
+
+  @media (max-width:1200px), (pointer:coarse){
+    html,body{height:100%}
+    body{height:100vh;height:100dvh;overflow:hidden}
+    header{gap:8px;padding:6px 10px;flex-shrink:0}
+    header h1{display:none}
+    header .badge{font-size:10px;max-width:26vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .toolbar{gap:5px}
+
+    .main{position:relative;overflow:hidden}
+    .left{width:100%;flex:1 1 100%;padding-bottom:calc(54px + env(safe-area-inset-bottom))}
+
+    /* Список и журнал — полноэкранные панели, переключаются табами */
+    .right,.journal{position:absolute;inset:0;width:100%;border-left:none;z-index:10;
+      padding-bottom:calc(54px + env(safe-area-inset-bottom))}
+    .right{display:none}
+    body[data-tab="list"] .right{display:block}
+    body[data-tab="journal"] .journal{display:flex}
+    body[data-tab="chart"] .journal,body[data-tab="list"] .journal{display:none}
+    body[data-tab="list"] .left,body[data-tab="journal"] .left{visibility:hidden}
+
+    /* Нижняя панель табов */
+    .mtabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:80;
+      background:var(--panel);border-top:1px solid var(--line);
+      padding-bottom:env(safe-area-inset-bottom)}
+    .mtabs button{flex:1;border:none;border-radius:0;background:transparent;
+      padding:15px 2px;font-size:11px;line-height:1.2;color:var(--mut);min-height:54px}
+    .mtabs button.act{color:var(--acc);box-shadow:inset 0 2px 0 var(--acc)}
+
+    /* Индикаторы — выдвижной шит снизу */
+    .indbar{position:fixed;left:0;right:0;bottom:calc(54px + env(safe-area-inset-bottom));
+      z-index:70;max-height:62dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+      transform:translateY(135%);transition:transform .22s ease;
+      border-top:1px solid var(--line);box-shadow:0 -10px 28px rgba(0,0,0,.5)}
+    .indbar.open{transform:translateY(0)}
+    .indbar .ibar{gap:8px 16px}
+    .indbar label{padding:7px 0;min-height:42px}
+
+    /* Осцилляторы — компактнее, чтобы графику осталось место */
+    .oscpane{height:74px}
+
+    /* Модалки на всю ширину */
+    .modal .box{width:calc(100vw - 16px)!important;max-height:88dvh;padding:14px}
+    .modal .whedit{grid-template-columns:1fr}
+    .prow{grid-template-columns:1fr 66px 52px;gap:6px}
+
+    /* Тап-таргеты ≥ 40px */
+    .tf{padding:9px 12px;min-height:40px;display:inline-flex;align-items:center}
+    .tfbar{overflow-x:auto;flex-wrap:nowrap}
+    .inst{padding:13px 14px;min-height:50px}
+    .jtrade{padding:10px 12px}
+    .jperiod button{padding:9px 0;min-height:38px}
+    select,button{min-height:40px}
+    #pagereload{min-width:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+  }
+
+  @media (max-width:420px){
+    .oscpane{height:64px}
+    .mtabs button{font-size:10px}
+  }
+
+  /* Ландшафт телефона (напр. 844x390): по высоте остаётся мало места */
+  @media (max-height:500px){
+    .oscpane{height:52px}
+    .mtabs button{padding:10px 2px;min-height:44px;font-size:10px}
+    .indbar{bottom:calc(44px + env(safe-area-inset-bottom));max-height:70dvh}
+    .left{padding-bottom:calc(44px + env(safe-area-inset-bottom))}
+    .right,.journal{padding-bottom:calc(44px + env(safe-area-inset-bottom))}
+  }
+
 </style>
 </head>
 <body>
@@ -167,6 +244,7 @@
       <option>1w</option><option>1M</option>
     </select>
     <button onclick="loadBars(true)" data-i18n="btn.refresh">⟳ Refresh</button>
+    <button id="pagereload" onclick="reloadPage()" data-i18n-title="tt.reload" title="Reload page" aria-label="Reload page"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 3v6h-6"/></svg></button>
     <button id="themebtn" onclick="toggleTheme()" data-i18n-title="tt.theme" title="Day/Night">🌙</button>
     <button id="aboutbtn" onclick="openModal('modalAbout')" data-i18n-title="tt.about" title="About">ℹ</button>
   </div>
@@ -220,7 +298,12 @@
   <div class="right" id="list"></div>
   <div class="journal" id="journal"></div>
 </div>
-</div>
+<nav class="mtabs">
+  <button data-tab="chart" class="act" onclick="setTab('chart')" data-i18n="mtab.chart">📈 Chart</button>
+  <button data-tab="list" onclick="setTab('list')" data-i18n="mtab.list">📋 List</button>
+  <button data-tab="journal" onclick="setTab('journal')" data-i18n="mtab.journal">📒 Journal</button>
+  <button data-sheet="1" onclick="toggleIndicatorSheet()" data-i18n="mtab.ind">⚙ Ind.</button>
+</nav>
 <div class="modal" id="modalParams"><div class="box">
   <h3 id="paramsTitle" data-i18n="params.title">Strategy parameters</h3>
   <div class="badge" id="paramsScope" style="display:block;margin-bottom:10px"></div>
@@ -336,10 +419,14 @@
 </div></div>
 <div class="modal" id="modalAbout"><div class="box">
   <h3>Rawanga Trading Desk <span style="font-size:11px;color:var(--mut);font-weight:400">v0.2.2</span></h3>
-  <p style="font-size:12px;color:var(--mut)"><span data-i18n="about.tagline">Portable charting and signals terminal.</span><br>© 2026 Andrei Maltsev · Rawanga AI</p>
+  <p style="font-size:12px;color:var(--mut)"><span data-i18n="about.tagline">Portable charting and signals terminal with algorithmic trading.</span><br>© 2026 Andrei Maltsev · Rawanga AI</p>
+  <p style="font-size:12px">
+    <span data-i18n="about.platforms">Platforms:</span> Windows · macOS · Linux · <span data-i18n="about.pwa">PWA app for smartphones and tablets</span><br>
+    <span data-i18n="about.trading">Trading:</span> BingX · Hyperliquid — <span data-i18n="about.algo">algorithmic (automated) trading</span>
+  </p>
   <p style="font-size:12px">
     <span data-i18n="about.site">Site:</span> <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a><br>
-    <span data-i18n="about.partner">Partner link:</span> <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener">bingx.com/partner/rawa/</a>
+    <span data-i18n="about.partner">Partner link:</span> <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener">bingx.com/partner/rawa/</a> · <a href="https://app.hyperliquid.xyz/join/RAWA" target="_blank" rel="noopener">app.hyperliquid.xyz/join/RAWA</a>
   </p>
   <p style="font-size:11px;color:var(--mut)" data-i18n="about.license">License: Apache License 2.0. Software is provided “as is”, not investment advice.</p>
   <p style="font-size:11px;color:var(--mut)" data-i18n="about.importrisk">⚠️ Imported strategies (.rwd.json) are third-party code, not vetted by the author. Import only from trusted sources and review the source first.</p>

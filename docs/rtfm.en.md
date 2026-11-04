@@ -24,7 +24,7 @@
 
 ## 0. What this is, and who it is for
 
-**Rawanga Trading Desk** is a portable desktop application for:
+**Rawanga Trading Desk** is a portable application for desktop (Windows / macOS / Linux) and for phones/tablets as a PWA, with **algorithmic trading**:
 
 - candlestick charts (timeframes 15m, 1h, 4h, 1d, 1w, 1M);
 - technical indicators (MA/EMA, RSI, MACD, ATR, Supertrend, Bollinger, Donchian, ADX…);
@@ -327,8 +327,10 @@ restarting.
 - Installation and offline caching require a **secure context**: `127.0.0.1` /
   `localhost` counts as secure, plain `http://<lan-ip>` does not.
 
-> The layout is **desktop-only** — there are no responsive breakpoints in this
-> build, so the interface is not adapted to phone screens.
+> **Mobile layout:** below 1200 px (or on a touch screen) the interface
+> switches to tabs — Chart / List / Journal — with a bottom indicator sheet, and
+> the candle spacing tightens. Install the PWA from the same URL to use it on a
+> phone or tablet. The desktop layout stays the reference one.
 
 Caching is deliberately conservative because this is a trading terminal:
 **`/api/*` is never cached** — prices, signals and trades always come from the

@@ -58,6 +58,63 @@ function initTheme() {
 
 const catTitles = { crypto: 'cat.crypto', stocks: 'cat.stocks', energy: 'cat.energy', metals: 'cat.metals', indices: 'cat.indices' };
 
+// ── Mobile layout: tabs + bottom indicator sheet ────────────────────
+// Below 1200px (or on a coarse pointer) the fixed side panels would not fit,
+// so the layout switches to full-screen tabs instead of shrinking them.
+const isNarrow = () => window.matchMedia('(max-width:1200px), (pointer:coarse)').matches;
+
+function resizeChart() {
+  const el = document.getElementById('chart');
+  if (!el || !chart) return;
+  chart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+  syncHvolSize();
+  drawHorizontalVol();
+}
+
+// On a 390px-wide screen a 12px candle is too fat — tighten spacing there.
+function applyMobileChartDensity() {
+  if (!chart) return;
+  if (isNarrow()) {
+    chart.timeScale().applyOptions({ barSpacing: 8, rightOffset: 12 });
+  } else {
+    chart.timeScale().applyOptions({ barSpacing: 12, rightOffset: 20 });
+  }
+}
+
+function setTab(tab) {
+  document.body.dataset.tab = tab;
+  document.querySelectorAll('.mtabs button[data-tab]').forEach(b => {
+    b.classList.toggle('act', b.dataset.tab === tab);
+  });
+  // Close the indicator sheet on tab change — otherwise it covers the panel
+  closeIndicatorSheet();
+  // The chart container was hidden (visibility/display), so size is stale
+  if (tab === 'chart') requestAnimationFrame(resizeChart);
+}
+
+function toggleIndicatorSheet() {
+  const bar = document.querySelector('.indbar');
+  if (!bar) return;
+  const opening = !bar.classList.contains('open');
+  if (!opening) { closeIndicatorSheet(); return; }
+  // The sheet lives inside .left, which is hidden on the List/Journal tabs —
+  // without forcing the chart tab the sheet would open invisibly.
+  if (document.body.dataset.tab !== 'chart') setTab('chart');
+  bar.classList.add('open');
+  document.querySelector('.mtabs button[data-sheet]')?.classList.add('act');
+}
+
+function closeIndicatorSheet() {
+  const bar = document.querySelector('.indbar');
+  if (!bar || !bar.classList.contains('open')) return;
+  bar.classList.remove('open');
+  document.querySelector('.mtabs button[data-sheet]')?.classList.remove('act');
+}
+
+function reloadPage() {
+  location.reload();
+}
+
 function initChart() {
   const el = document.getElementById('chart');
   chart = LightweightCharts.createChart(el, {
@@ -1431,9 +1488,16 @@ window.onLangChange = () => {
 (async function main() {
   initTheme();
   initChart(); initTfBar();
+  applyMobileChartDensity();
   await loadInstruments();
   await loadStrategies();
   await loadBars(true);
+  // Rotating a tablet or resizing the window: recompute size and density
+  let _rz = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_rz);
+    _rz = setTimeout(() => { resizeChart(); applyMobileChartDensity(); }, 150);
+  });
   // The journal is a permanent panel: fill it for the default symbol instead
   // of leaving it empty until the first click.
   await openJournal(current.symbol);

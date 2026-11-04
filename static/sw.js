@@ -27,7 +27,7 @@
  *   3) /static/* — cache-first (assets are versioned: app.js carries ?v=<hash>).
  *   4) everything else, GET, same origin — network-first, cache fallback.
  */
-const VER = "rtd-v1";
+const VER = "rtd-v2";   // bumped: shell assets changed (mobile layout)
 const SHELL = [
   "/",
   "/static/js/app.js",

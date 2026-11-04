@@ -24,7 +24,7 @@
 
 ## 0. Qué es y para quién
 
-**Rawanga Trading Desk** es una aplicación de escritorio portátil para:
+**Rawanga Trading Desk** es una aplicación portátil para escritorio (Windows / macOS / Linux) y para móvil/tablet como PWA, con **trading algorítmico**:
 
 - gráficos de velas (marcos temporales 15m, 1h, 4h, 1d, 1w, 1M);
 - indicadores técnicos (MA/EMA, RSI, MACD, ATR, Supertrend, Bollinger, Donchian, ADX…);
@@ -332,8 +332,11 @@ escritorio/móvil y abre su ventana incluso mientras el servidor local se reinic
 - La instalación y la caché offline requieren un **contexto seguro**: `127.0.0.1`
   / `localhost` cuenta como seguro; `http://<ip-lan>` no.
 
-> El diseño es **solo para escritorio**: no hay puntos de ruptura responsive en
-> esta compilación, así que la interfaz no se adapta a pantallas de teléfono.
+> **Diseño móvil:** por debajo de 1200 px (o en pantalla táctil) la interfaz
+> pasa a pestañas — Gráfico / Lista / Diario — con una hoja de indicadores
+> deslizable abajo, y el paso de las velas se reduce. Instala la PWA desde la
+> misma dirección para usarla en móvil o tablet. El diseño de escritorio sigue
+> siendo la referencia.
 
 La caché es deliberadamente conservadora, es un terminal de trading:
 **`/api/*` nunca se cachea** — precios, señales y operaciones siempre vienen del

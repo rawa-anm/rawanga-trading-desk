@@ -1,13 +1,17 @@
 # Rawanga Trading Desk
 
-Portable, cross-platform charting / indicator / signal terminal (desktop app for
-Windows / macOS / Linux). A local server on `127.0.0.1` plus a browser UI. Your
-data is stored next to the application (`data/`).
+Portable, cross-platform charting / indicator / signal terminal **with
+algorithmic trading** (desktop app for Windows / macOS / Linux, plus a **PWA app
+for smartphones and tablets**). A local server on `127.0.0.1` plus a browser UI.
+Your data is stored next to the application (`data/`).
 
 - Website: https://rawanga.es
 - Partner link (BingX): https://bingx.com/partner/rawa/
 - **Download (prebuilt, portable):** [latest release](https://github.com/rawa-anm/rawanga-trading-desk/releases/latest)
   — Windows x64 (`.zip`), macOS Intel / Apple Silicon (`.tar.gz`), Linux x64 (`.tar.gz`).
+- **Mobile:** install as a PWA from the same URL (browsers → "Add to Home
+  Screen"). Charts and the journal work on phones and tablets; the layout is
+  desktop-first.
 
 > Intended use: **individual, single-user**. There is no authentication and no
 > multi-user separation — see the RTFM guide before hosting anywhere.
@@ -29,6 +33,10 @@ data is stored next to the application (`data/`).
 - Optional e-mail alerts to your own mailbox (SMTP; personal, single recipient).
 - Exchange integration: BingX and Hyperliquid (disabled by default; keys are stored
   encrypted, one exchange active at a time — see the switching guide).
+- **Algorithmic (automated) trading:** strategies trade on their own once enabled
+  for a symbol — entry, trailed stop and exit without manual clicks.
+- **PWA app** for smartphones and tablets: the same terminal installed to the
+  home screen, without an app store.
 
 ## Run from source
 
