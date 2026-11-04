@@ -1,0 +1,35 @@
+{
+  "name": "Rawanga Trading Desk",
+  "short_name": "Rawanga Desk",
+  "description": "Portable charting, indicator and signal terminal. Runs locally.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0e1117",
+  "theme_color": "#0e1117",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "static/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

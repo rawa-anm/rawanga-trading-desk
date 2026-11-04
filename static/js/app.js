@@ -1280,3 +1280,14 @@ window.onLangChange = () => {
   setInterval(loadTradeAccount, 60000);
   setInterval(() => loadBars(true, true), 60000);
 })();
+
+// ── PWA: service worker registration ───────────────────────────────
+// Lets the window open even when the local server is restarting (the shell is
+// served from cache). /api/* is never cached by the SW — prices stay live.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(r => console.info('[pwa] sw ok', r.scope))
+      .catch(e => console.warn('[pwa] sw fail', e));
+  });
+}

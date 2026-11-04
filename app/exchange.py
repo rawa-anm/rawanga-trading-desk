@@ -246,6 +246,76 @@ async def income(income_type: str = "REALIZED_PNL", limit: int = 200, client=Non
     return d.get("data") or []
 
 
+async def income_all(income_type: str = "REALIZED_PNL", start_ms: int | None = None,
+                      client=None, max_pages: int = 60) -> list[dict]:
+    """Full income history, page by page.
+
+    The exchange returns only the last 7 days of income unless startTime is
+    given, so a single call silently truncates the total: the PnL card then
+    shows a loss where there is none. We therefore walk forward page by page,
+    deduplicating, until an empty or non-advancing page arrives.
+    """
+    out: list[dict] = []
+    seen: set = set()
+    cursor = int(start_ms or 0)
+    for _ in range(max_pages):
+        params = {"incomeType": income_type, "limit": 1000}
+        if cursor:
+            params["startTime"] = cursor
+        d = await request("GET", "/openApi/swap/v2/user/income",
+                          params, signed=True, client=client)
+        arr = d.get("data") or []
+        if not arr:
+            break
+        fresh = 0
+        for x in arr:
+            key = (x.get("tranId"), x.get("tradeId"), x.get("time"), x.get("income"))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(x)
+            fresh += 1
+        if not fresh:
+            break
+        mx = max(int(x.get("time") or 0) for x in arr)
+        if mx < cursor:
+            break
+        cursor = mx + 1
+    return out
+
+
+async def pnl_history(client=None, start_ms: int | None = None) -> dict:
+    """REALIZED_PNL + FUNDING_FEE totals over the whole trading history.
+
+    Funding is a separate income type and was not subtracted into PnL at all;
+    both are now summed. Read-only: no orders are touched.
+    """
+    import datetime as _dt
+
+    realized_rows = await income_all("REALIZED_PNL", start_ms, client=client)
+    funding_rows = await income_all("FUNDING_FEE", start_ms, client=client)
+
+    def _sum(rows: list[dict]) -> float:
+        tot = 0.0
+        for r in rows:
+            try:
+                tot += float(r.get("income", 0) or 0)
+            except (TypeError, ValueError):
+                pass
+        return round(tot, 6)
+
+    times = [int(x.get("time") or 0) for x in realized_rows + funding_rows]
+    since = until = None
+    if times:
+        since = _dt.datetime.fromtimestamp(min(times) / 1000).strftime("%Y-%m-%d")
+        until = _dt.datetime.fromtimestamp(max(times) / 1000).strftime("%Y-%m-%d")
+
+    r_sum, f_sum = _sum(realized_rows), _sum(funding_rows)
+    return {"realized": r_sum, "funding": f_sum,
+            "total": round(r_sum + f_sum, 6),
+            "records": len(realized_rows), "since": since, "until": until}
+
+
 def realised_pnl_total(records: list[dict]) -> float:
     tot = 0.0
     for r in records:

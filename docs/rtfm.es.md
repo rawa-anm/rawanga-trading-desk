@@ -132,6 +132,33 @@ Variables de entorno:
 
 ---
 
+## 4a. Stop-loss y trailing
+
+En cada barra se comprueban tres salidas, por orden de prioridad: **stop duro** →
+**take-profit** (opcional) → **trailing del stop** → la señal de salida de la
+propia estrategia.
+
+- **Stop duro** — siempre activo. La distancia viene de la estrategia (`atr * mult`),
+  con un mínimo por clase de instrumento (cripto 2%, acciones 1%, materias primas/
+  metales/índices/divisas 0.5%), para que un ATR aplanado no reduzca el stop al
+  ruido del tick.
+- **Trailing del stop** — un solo mecanismo, no dos. En las estrategias que emiten
+  líneas de canal (la Vol+ADX integrada) el stop se coloca **en la línea opuesta
+  del canal** y solo se mueve en la dirección del beneficio: la línea pasa el
+  precio — el stop se arrastra; la línea retrocede — el stop se queda. Se activa
+  solo para esas estrategias en **todos los marcos temporales**, y se puede
+  desactivar con `line_stop=false`.
+- El trailing porcentual (`use_trail` / `trail_pct`) se mantiene por compatibilidad
+  con estrategias propias sin líneas de canal. Cuando el trailing por línea está
+  activo, el porcentual **no** se aplica: dos mecanismos en un mismo instrumento
+  darían comportamientos distintos sobre los mismos datos.
+
+El diario y `/api/signals` muestran siempre el stop **actual**, no el de la
+entrada: el trailing lo mueve en silencio dentro de una posición abierta y no
+emite evento, por eso se lee del estado de la posición viva.
+
+---
+
 ## 5. Dónde viven tus datos y copias de seguridad
 
 Todos los datos de usuario están en el **directorio de datos** (por defecto
@@ -276,6 +303,26 @@ sudo systemctl enable --now rawanga-trading-desk
   de terceros no están escritas ni verificadas por el autor, que no se
   responsabiliza de ellas.
 - Referencia completa: botón **📘 Strategy docs** (en EN/RU/ES).
+
+---
+
+## 8a. Instalar como aplicación (PWA)
+
+La interfaz es también una **Progressive Web App**: se instala como aplicación de
+escritorio/móvil y abre su ventana incluso mientras el servidor local se reinicia.
+
+- **Chrome / Edge (escritorio):** abrir la dirección → aparece el icono de
+  instalación en la barra → *Instalar*. Después la app se abre en su propia ventana.
+- La instalación y la caché offline requieren un **contexto seguro**: `127.0.0.1`
+  / `localhost` cuenta como seguro; `http://<ip-lan>` no.
+
+> El diseño es **solo para escritorio**: no hay puntos de ruptura responsive en
+> esta compilación, así que la interfaz no se adapta a pantallas de teléfono.
+
+La caché es deliberadamente conservadora, es un terminal de trading:
+**`/api/*` nunca se cachea** — precios, señales y operaciones siempre vienen del
+servidor, y sin conexión se devuelve `503`, no una respuesta antigua. Solo se
+cachean el armazón de la aplicación y los estáticos versionados.
 
 ---
 

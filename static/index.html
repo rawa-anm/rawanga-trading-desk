@@ -17,6 +17,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="theme-color" content="#0e1117">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="Portable charting, indicator and signal terminal. Runs locally.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/favicon-32.png">
+<!-- No <meta viewport>: this is a desktop-only layout (there are no responsive
+     breakpoints in the CSS). Adding it would squeeze the fixed-width side
+     panels on a phone instead of switching layouts. -->
 <title>Rawanga Trading Desk</title>
 <style>
   :root{--bg:#0e1117;--panel:#161b22;--line:#232b36;--txt:#d5dae3;--mut:#7d8796;--up:#26a69a;--dn:#ef5350;--acc:#3b82f6;--grid:#1b2129;--hover:#1c2230;--sel:#1e2930;--ctrl:#1e2530;--input:#0e1117}
@@ -301,7 +309,7 @@
   <button onclick="addInstrument()" style="background:var(--acc);color:#fff" data-i18n="btn.add">Add</button></div>
 </div></div>
 <div class="modal" id="modalAbout"><div class="box">
-  <h3>Rawanga Trading Desk</h3>
+  <h3>Rawanga Trading Desk <span style="font-size:11px;color:var(--mut);font-weight:400">v0.2.0</span></h3>
   <p style="font-size:12px;color:var(--mut)"><span data-i18n="about.tagline">Portable charting and signals terminal.</span><br>© 2026 Andrei Maltsev · Rawanga AI</p>
   <p style="font-size:12px">
     <span data-i18n="about.site">Site:</span> <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a><br>

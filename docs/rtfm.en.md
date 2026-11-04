@@ -130,6 +130,31 @@ Environment variables:
 
 ---
 
+## 4a. Stop-loss and trailing
+
+Three exit checks run on every bar, in this priority order: **hard stop** →
+**take-profit** (optional) → **stop trailing** → the strategy's own exit signal.
+
+- **Hard stop** — always on. Distance comes from the strategy (`atr * mult`),
+  with a floor per instrument class (crypto 2%, stocks 1%, commodities/metals/
+  indices/fx 0.5%), so a flattened ATR cannot collapse the stop into tick noise.
+- **Stop trailing** — one single mechanism, not two. For strategies that emit
+  channel lines (the built-in Vol+ADX system), the stop sits **on the opposite
+  channel line** and only moves in the direction of profit: the line moves past
+  the price — the stop is trailed; the line rolls back — the stop stays put.
+  It switches on automatically for such strategies on **every timeframe**, and
+  can be force-disabled per instrument with `line_stop=false`.
+- The percentage trailing (`use_trail` / `trail_pct`) is kept for compatibility
+  with custom strategies that have no channel lines. When channel-line trailing
+  is active it is **not** applied — two mechanisms on one instrument would
+  behave differently on identical data.
+
+The journal and `/api/signals` always show the **current** stop, not the stop as
+it was at entry: trailing moves it silently inside an open position and emits no
+event, so it is read from the live position state.
+
+---
+
 ## 5. Where your data lives, and backups
 
 All user data is in the **data directory** (by default `./data` next to the
@@ -272,6 +297,27 @@ sudo systemctl enable --now rawanga-trading-desk
   of safety, correctness or profitability. Third-party strategies are not written
   or vetted by the author, who is not liable for them.
 - Full reference: the **📘 Strategy docs** button (in EN/RU/ES).
+
+---
+
+## 8a. Install as an app (PWA)
+
+The interface is also a **Progressive Web App**, so it can be installed like a
+desktop/mobile app and still opens its window when the local server is
+restarting.
+
+- **Chrome / Edge (desktop):** open the address → the install icon appears in
+  the address bar → *Install*. The app then opens in its own window.
+- Installation and offline caching require a **secure context**: `127.0.0.1` /
+  `localhost` counts as secure, plain `http://<lan-ip>` does not.
+
+> The layout is **desktop-only** — there are no responsive breakpoints in this
+> build, so the interface is not adapted to phone screens.
+
+Caching is deliberately conservative because this is a trading terminal:
+**`/api/*` is never cached** — prices, signals and trades always come from the
+server, and offline requests get `503` rather than a stale response. Only the
+app shell and versioned static assets are cached.
 
 ---
 

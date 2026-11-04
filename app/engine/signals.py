@@ -79,6 +79,11 @@ def rawa_system(df: pd.DataFrame, donch_entry=10, donch_exit=5, atr_len=14,
     d["don_hi"], d["don_lo"], d["atr"], d["adx"], d["vol_ma"] = don_hi, don_lo, a, adx, vol_ma
     d["long"] = long_sig.fillna(False)
     d["short"] = short_sig.fillna(False)
+    # The stop sits ON THE OPPOSITE channel line, not at a percentage:
+    # long -> lower line (don_lo), short -> upper line (don_hi).
+    # shift(1) = the same bar the entry decision is made on.
+    d["stop_line_long"] = don_lo.shift(1)
+    d["stop_line_short"] = don_hi.shift(1)
     d["stop_abs"] = a * atr_mult
     return d
 
@@ -160,9 +165,9 @@ def run(df: pd.DataFrame, name: str, params: dict | None = None) -> pd.DataFrame
     return fn(df, **clean)
 
 
-def signals_only(d: pd.DataFrame, opt: dict | None = None,
-                 category: str = "crypto") -> list[dict]:
-    """Returns signals with entry AND exit points + stop size.
+def _walk(d: pd.DataFrame, opt: dict | None = None,
+          category: str = "crypto") -> tuple[list[dict], dict | None]:
+    """Returns (events, last open position) — events plus the live position state.
 
     IMPORTANT: an entry is opened only on a TRANSITION (no position → there is a signal).
     While a position of the same direction is open, repeated long/short are ignored.
@@ -171,13 +176,33 @@ def signals_only(d: pd.DataFrame, opt: dict | None = None,
     Exits checked ON EVERY BAR (intra-bar, by low/high), in priority order:
       1) HARD STOP (like strategy.exit(stop=...)) — always enabled.
       2) TAKE-PROFIT (opt.use_tp) — optional, not needed by reversal strategies.
-      3) TRAILING STOP (opt.use_trail) — optional; trails the stop after the price.
+      3) STOP TRAILING — one single mechanism, `line_stop`: the stop sits on the
+         opposite channel line and only moves in the direction of profit.
+         Enabled automatically for strategies that emit channel lines (rawa_system).
+         The percentage opt.use_trail is kept for compatibility, but is NOT applied
+         while line_stop is on — there must be only one mechanism per instrument.
     Plus exit by the strategy's own signal (exit / reversal).
+
+    The second element is needed so the CALLER can read the CURRENT (trailed) stop:
+    events carry a stop only at entry and at exit, whereas trailing moves it
+    silently inside an open position.
     """
     o = opt or {}
     use_tp = bool(o.get("use_tp", False))
     tp_pct = float(o.get("tp_pct", 0) or 0)          # % of the entry price
-    use_trail = bool(o.get("use_trail", False))
+    # line_stop: the stop is placed ON THE OPPOSITE CHANNEL LINE (not a percentage)
+    # and is then only trailed with the trend. Entry lines never change.
+    #
+    # It turns itself ON when the strategy emitted channel lines (rawa_system), so
+    # the mechanism is the same on every instrument and timeframe without per-row
+    # settings in the DB; strategies without lines (custom/Python ones) have no such
+    # columns, hence line_stop stays off for them, exactly as before.
+    # Can be force-disabled with an explicit line_stop=false parameter.
+    line_stop = bool(o.get("line_stop", "stop_line_long" in d.columns))
+    # Percentage trailing — a second, separate way to trail the stop. It is not
+    # applied when line_stop is on: two different mechanisms on one instrument
+    # produce different behaviour on identical data. There must be only one.
+    use_trail = bool(o.get("use_trail", False)) and not line_stop
     trail_pct = float(o.get("trail_pct", 0) or 0)    # % of the max/min since entry
 
     out = []
@@ -211,6 +236,23 @@ def signals_only(d: pd.DataFrame, opt: dict | None = None,
                     trail_active = True
                     in_pos["trailing"] = True
                 in_pos["stop"] = new_stop
+            # ── TRAILING ALONG THE CHANNEL LINE ─────────────────────
+            # The stop lives on the opposite line and moves ONLY in the direction
+            # of profit: the line moved past the price — the stop is trailed up;
+            # the line rolled back — the stop stays where it is.
+            # The line value for bar i is known BEFORE that bar opens (it is shift(1)),
+            # so the touch check below (by low/high of bar i) does not look ahead.
+            if line_stop:
+                _ln = row.get("stop_line_long" if side == "long" else "stop_line_short")
+                if _ln is not None and not pd.isna(_ln) and float(_ln) > 0:
+                    prev = in_pos.get("stop")
+                    if side == "long":
+                        new_stop_line = max(float(prev) if prev else 0.0, float(_ln))
+                    else:
+                        new_stop_line = min(float(prev) if prev else 1e18, float(_ln))
+                    if prev is None or abs(new_stop_line - float(prev)) > 1e-12:
+                        in_pos["trailing"] = True
+                    in_pos["stop"] = new_stop_line
             stop = in_pos.get("stop")
             tp = None
             if use_tp and tp_pct > 0:
@@ -219,6 +261,7 @@ def signals_only(d: pd.DataFrame, opt: dict | None = None,
             if stop is not None and ((side == "long" and lo <= stop) or (side == "short" and hi >= stop)):
                 out.append({"ts": ts, "close": stop, "side": "exit",
                             "exit_of": side, "atr": in_pos.get("atr"), "reason": "stop",
+                            "stop": stop,
                             "trailing": bool(in_pos.get("trailing"))})
                 in_pos = None
                 stopped = True
@@ -231,7 +274,8 @@ def signals_only(d: pd.DataFrame, opt: dict | None = None,
             elif want_exit:
                 # exit by the strategy's own signal
                 out.append({"ts": ts, "close": close, "side": "exit",
-                            "exit_of": side, "atr": in_pos.get("atr"), "reason": "signal"})
+                            "exit_of": side, "atr": in_pos.get("atr"), "reason": "signal",
+                            "stop": in_pos.get("stop")})
                 in_pos = None
 
         if stopped:
@@ -250,7 +294,7 @@ def signals_only(d: pd.DataFrame, opt: dict | None = None,
                 # reversal: close and open the opposite
                 out.append({"ts": ts, "close": close, "side": "exit",
                             "exit_of": in_pos["side"], "atr": in_pos.get("atr"),
-                            "reason": "reversal"})
+                            "reason": "reversal", "stop": in_pos.get("stop")})
                 in_pos = None
             else:
                 continue                          # same signal - ignore, no re-entry
@@ -265,7 +309,34 @@ def signals_only(d: pd.DataFrame, opt: dict | None = None,
             out.append({"ts": ts, "close": close, "side": new_side,
                         "entry": close, "stop": stop, "atr": atr_v,
                         "vol_score": vol_score})
+    return out, in_pos
+
+
+def signals_only(d: pd.DataFrame, opt: dict | None = None,
+                 category: str = "crypto") -> list[dict]:
+    """Strategy event stream (entries/exits). Thin wrapper over _walk.
+
+    The open position is exposed by current_position(): its trailed stop is
+    deliberately NOT part of the event stream, so consumers that notify on the
+    last event keep working unchanged.
+    """
+    out, _pos = _walk(d, opt, category)
     return out
+
+
+def current_position(d: pd.DataFrame, opt: dict | None = None,
+                     category: str = "crypto") -> dict | None:
+    """The position still open at the end of the series.
+
+    Returns {'side','entry','stop','trailing'} or None. Needed so the UI/journal
+    can show the CURRENT (already trailed) stop, not the stop at entry: trailing
+    moves the stop silently inside an open position and emits no event.
+    """
+    _out, pos = _walk(d, opt, category)
+    if not pos:
+        return None
+    return {"side": pos.get("side"), "entry": pos.get("entry"),
+            "stop": pos.get("stop"), "trailing": bool(pos.get("trailing"))}
 
 
 def _vol_score(row) -> int | None:

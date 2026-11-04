@@ -41,6 +41,10 @@ def build_trades(signals: list[dict]) -> list[dict]:
                 "vol_score": s.get("vol_score"),
             }
         elif s["side"] == "exit" and open_pos:
+            # the stop at the moment of EXIT (the engine puts it into the event,
+            # already trailed) — otherwise the journal shows the entry-time stop
+            if s.get("stop") is not None:
+                open_pos["stop"] = s["stop"]
             trades.append(_close(open_pos, s["ts"], s["close"],
                                  reason=s.get("reason") or "signal",
                                  trailing=bool(s.get("trailing"))))

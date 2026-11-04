@@ -105,6 +105,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC)), name="static")
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "rawanga-trading-desk",
+            "version": APP_VERSION,
             "instruments": len(INSTRUMENTS), "bars_cached": await cache.count()}
 
 
@@ -122,6 +123,62 @@ async def list_instruments():
     rows = await store.list_instruments()
     return {"instruments": [{"symbol": r["symbol"], "kind": r["kind"], "yahoo": r["yahoo"],
                             "category": r["category"], "title": r["title"]} for r in rows]}
+
+
+@app.get("/api/change24")
+async def change_24h():
+    """24h price change, % — for the column in the instrument list.
+
+    Crypto: one batch ticker request. Everything else (stocks/energy/indices/
+    trend): the last two daily bars from the local cache. READ-ONLY — trading
+    logic is not touched.
+
+    Only category == 'crypto' goes through the exchange batch: otherwise GOLD/
+    SPX/BRENT match same-named crypto tokens and the column shows the price of
+    a different asset (SPX showed 0.35 instead of ~7580).
+    """
+    rows = await store.list_instruments()
+    out: dict[str, dict] = {}
+
+    bx_map: dict[str, str] = {}
+    for r in rows:
+        if r.get("category") != "crypto":
+            continue
+        try:
+            bx_map[ex.bingx_symbol(r["symbol"])] = r["symbol"]
+        except Exception:  # noqa: BLE001
+            pass
+    if bx_map:
+        try:
+            d = await ex.request("GET", "/openApi/swap/v2/quote/ticker",
+                                 client=app.state.client)
+            for t in (d.get("data") or []):
+                sym = bx_map.get(t.get("symbol"))
+                if not sym:
+                    continue
+                try:
+                    out[sym] = {"pct": float(t.get("priceChangePercent")),
+                                "price": float(t.get("lastPrice")),
+                                "src": "exchange"}
+                except (TypeError, ValueError):
+                    pass
+        except Exception as e:  # noqa: BLE001
+            log.warning("change24: exchange batch failed: %s", e)
+
+    for r in rows:
+        sym = r["symbol"]
+        if sym in out:
+            continue
+        try:
+            bars = await cache.get_bars(sym, "1d", 2)
+        except Exception:  # noqa: BLE001
+            bars = []
+        if len(bars) >= 2:
+            prev, last = bars[-2][4], bars[-1][4]
+            if prev:
+                out[sym] = {"pct": round((last / prev - 1) * 100, 2),
+                            "price": last, "src": "cache"}
+    return {"changes": out}
 
 
 @app.post("/api/instruments")
@@ -231,6 +288,13 @@ async def sig(symbol: str, strategy: str = "stv3", tf: str = "1h", limit: int = 
     # return TRADES (entry→exit), not raw signals — so chart and journal match
     _sig = eng.signals_only(d, params)
     built = tr.build_trades(_sig)
+    # the CURRENT (already trailed) stop for the open position: trailing moves
+    # the stop silently inside a position and emits no event, so build_trades
+    # alone would keep showing the stop as it was at entry
+    _pos = eng.current_position(d, params, meta.get("category", "crypto"))
+    if built["open"] and _pos:
+        built["open"]["stop"] = _pos["stop"]
+        built["open"]["trailing"] = _pos["trailing"]
     return {"symbol": meta["symbol"], "strategy": strategy, "tf": tf,
             "title": eng.STRATEGIES[strategy]["title"],
             "params_used": params,
@@ -264,6 +328,9 @@ async def trend(symbol: str, tf: str = "1h", limit: int = 500,
 
 # Trade-journal depth (candles). Was 500 (~20 days on 1h) — profitable trades
 # fell out of the sliding window and the journal showed a loss. Now 3000 candles.
+# Application version. Shown in /health and in the About window.
+APP_VERSION = "0.2.0"
+
 JOURNAL_DEPTH = 3000
 
 
@@ -284,6 +351,10 @@ async def trades_endpoint(symbol: str, strategy: str = "stv3", tf: str = "1h",
     d = eng.run(_df(rows), strategy, params)
     sigs = eng.signals_only(d, params, meta.get("category", "crypto"))
     built = tr.build_trades(sigs)
+    _pos = eng.current_position(d, params, meta.get("category", "crypto"))
+    if built["open"] and _pos:
+        built["open"]["stop"] = _pos["stop"]
+        built["open"]["trailing"] = _pos["trailing"]
     all_trades = built["trades"]
     return {
         "symbol": meta["symbol"], "strategy": strategy, "tf": tf,
@@ -559,6 +630,23 @@ async def set_strategy_params(strategy: str, payload: dict):
     return {"ok": True}
 
 
+# ── PWA: manifest and service worker ─────────────────────────────
+# Served from the root so the SW scope is "/" (from /static the scope would be
+# limited to the /static directory and the app shell could not be cached).
+@app.get("/manifest.webmanifest")
+async def manifest():
+    return FileResponse(STATIC / "manifest.json",
+                        media_type="application/manifest+json",
+                        headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse(STATIC / "sw.js", media_type="application/javascript",
+                        headers={"Cache-Control": "no-cache",
+                                 "Service-Worker-Allowed": "/"})
+
+
 @app.get("/")
 async def index():
     html = (STATIC / "index.html").read_text(encoding="utf-8")
@@ -766,20 +854,40 @@ async def trade_available():
 
 @app.get("/api/trade/account")
 async def trade_account():
-    """Balance + PnL from real closed trades (REALIZED_PNL) + positions."""
+    """Balance + PnL over the whole history (REALIZED_PNL + FUNDING_FEE) + positions.
+
+    The PnL window starts at trade_settings.pnl_start (YYYY-MM-DD) when set;
+    otherwise the entire available history is walked. Without a start time the
+    exchange returns only the last 7 days and the total silently understates.
+    """
     if not ex.masked_keys()["has_keys"]:
         return {"connected": False, "error": "API keys are not set"}
     try:
         bal = await ex.balance(client=app.state.client)
         pos = await ex.positions(client=app.state.client)
-        inc = await ex.income("REALIZED_PNL", 500, client=app.state.client)
+        settings = await store.get_trade_settings()
+        start_ms = None
+        start = (settings.get("pnl_start") or "").strip()
+        if start:
+            import datetime as _dt
+            try:
+                start_ms = int(_dt.datetime.fromisoformat(start).timestamp() * 1000)
+            except ValueError:
+                log.warning("pnl_start is not a date: %r — using full history", start)
+        pnl = await ex.pnl_history(client=app.state.client, start_ms=start_ms)
     except Exception as e:  # noqa: BLE001
         return {"connected": False, "error": str(e)}
     return {
         "connected": True,
         "balance": bal,
-        "pnl_realized_total": ex.realised_pnl_total(inc),
-        "pnl_records": len(inc),
+        # kept for compatibility — now the honest total
+        "pnl_realized_total": pnl["total"],
+        "pnl_total": pnl["total"],
+        "pnl_realized": pnl["realized"],
+        "pnl_funding": pnl["funding"],
+        "pnl_records": pnl["records"],
+        "pnl_since": pnl["since"],
+        "pnl_until": pnl["until"],
         "positions": pos,
     }
 

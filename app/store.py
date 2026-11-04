@@ -292,6 +292,7 @@ DEFAULT_TRADE_SETTINGS = {
     "live_enabled": "0",   # 0/1 — the main real-trading switch
     "leverage": "5",       # leverage for swap positions
     "entry_pct": "10",     # % of free balance per position
+    "pnl_start": "",       # YYYY-MM-DD — start of the PnL history (empty = all)
 }
 
 
@@ -315,7 +316,7 @@ async def get_trade_settings() -> dict:
 
 async def set_trade_settings(fields: dict):
     async with aiosqlite.connect(DB) as db:
-        for k in ("live_enabled", "leverage", "entry_pct"):
+        for k in ("live_enabled", "leverage", "entry_pct", "pnl_start"):
             if k not in fields or fields[k] is None:
                 continue
             v = fields[k]
