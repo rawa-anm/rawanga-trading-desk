@@ -346,6 +346,10 @@ async def levels(symbol: str, strategy: str = "rawa_system", tf: str = "1h",
         raise HTTPException(404, f"unknown symbol {symbol}")
     if strategy not in eng.STRATEGIES:
         raise HTTPException(400, f"unknown strategy {strategy}")
+    # same whitelist as every other bars endpoint: tf reaches a DB query
+    if tf not in VALID_TFS:
+        raise HTTPException(400, f"tf must be {'|'.join(VALID_TFS)}")
+    limit = max(3, min(int(limit), 5000))
 
     rows = await cache.get_bars(meta["symbol"], tf, limit)
     if len(rows) < 3:
@@ -424,7 +428,7 @@ async def trend(symbol: str, tf: str = "1h", limit: int = 500,
 # Trade-journal depth (candles). Was 500 (~20 days on 1h) — profitable trades
 # fell out of the sliding window and the journal showed a loss. Now 3000 candles.
 # Application version. Shown in /health and in the About window.
-APP_VERSION = "0.2.1"
+APP_VERSION = "0.2.2"
 
 JOURNAL_DEPTH = 3000
 

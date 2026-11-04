@@ -122,6 +122,8 @@
   .bal{font-variant-numeric:tabular-nums;font-weight:600}
   .bal.pos{color:var(--up)} .bal.neg{color:var(--dn)}
   .tk{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .tk .chg{font-variant-numeric:tabular-nums;font-size:11px;min-width:52px;text-align:right;margin-left:6px}
+  .tk .chg.pos{color:var(--up)} .tk .chg.neg{color:var(--dn)} .tk .chg.zero{color:var(--mut)}
   .tk .icn{cursor:pointer;color:#8b96a5;padding:0 4px}
   .tk .icn:hover{color:var(--txt)}
   .tk .icn.del:hover{color:var(--dn)}
@@ -333,7 +335,7 @@
   <button onclick="addInstrument()" style="background:var(--acc);color:#fff" data-i18n="btn.add">Add</button></div>
 </div></div>
 <div class="modal" id="modalAbout"><div class="box">
-  <h3>Rawanga Trading Desk <span style="font-size:11px;color:var(--mut);font-weight:400">v0.2.1</span></h3>
+  <h3>Rawanga Trading Desk <span style="font-size:11px;color:var(--mut);font-weight:400">v0.2.2</span></h3>
   <p style="font-size:12px;color:var(--mut)"><span data-i18n="about.tagline">Portable charting and signals terminal.</span><br>© 2026 Andrei Maltsev · Rawanga AI</p>
   <p style="font-size:12px">
     <span data-i18n="about.site">Site:</span> <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a><br>

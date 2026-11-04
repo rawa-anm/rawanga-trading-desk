@@ -1395,7 +1395,9 @@ async function refreshTkList() {
   tkCache.forEach(t => {
     const d = document.createElement('div');
     d.className = 'tk' + (t.enabled ? '' : ' off');
-    d.innerHTML = `<span>${t.enabled ? '✅' : '⛔'} <b>${esc(t.symbol)}</b> · ${esc(t.bingx_symbol)} · ${esc(t.category || '')}</span>`;
+    const _s = esc(t.symbol);
+    d.innerHTML = `<span>${t.enabled ? '✅' : '⛔'} <b>${_s}</b> · ${esc(t.bingx_symbol)} · ${esc(t.category || '')}`
+      + `<span class="chg zero" data-chg="${_s}">—</span></span>`;
     const box = document.createElement('span');
     const tg = document.createElement('span'); tg.className = 'icn'; tg.textContent = t.enabled ? '⏸' : '▶'; tg.title = t2('tickers.toggle');
     tg.onclick = async () => { await fetch(`${API}/api/trade/tickers/${t.symbol}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !t.enabled }) }); refreshTkList(); };
@@ -1403,6 +1405,7 @@ async function refreshTkList() {
     del.onclick = async () => { if (!confirm(t2('tickers.remove', { sym: t.symbol }))) return; await fetch(`${API}/api/trade/tickers/${t.symbol}`, { method: 'DELETE' }); refreshTkList(); };
     box.append(tg, del); d.appendChild(box); el.appendChild(d);
   });
+  loadChanges24();
 }
 
 async function addTicker() {
