@@ -124,6 +124,10 @@
   .tk{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:6px}
   .tk .chg{font-variant-numeric:tabular-nums;font-size:11px;min-width:52px;text-align:right;margin-left:6px}
   .tk .chg.pos{color:var(--up)} .tk .chg.neg{color:var(--dn)} .tk .chg.zero{color:var(--mut)}
+  .tk .tknum{display:flex;align-items:center;gap:8px}
+  .tk .px{color:var(--mut);font-variant-numeric:tabular-nums}
+  .tk .chg{font-variant-numeric:tabular-nums;font-size:11px;min-width:52px;text-align:right}
+  .tk .chg.pos{color:var(--up)} .tk .chg.neg{color:var(--dn)} .tk .chg.zero{color:var(--mut)}
   .tk .icn{cursor:pointer;color:#8b96a5;padding:0 4px}
   .tk .icn:hover{color:var(--txt)}
   .tk .icn.del:hover{color:var(--dn)}
@@ -411,14 +415,15 @@
   <h3 data-i18n="inst.title">Add instrument</h3>
   <label data-i18n="inst.ticker">Ticker</label><input id="insSymbol" placeholder="SOL">
   <label data-i18n="inst.name">Name</label><input id="insTitle" placeholder="Solana">
-  <label data-i18n="inst.category">Category</label><select id="insCat"><option value="crypto" data-i18n="cat.crypto">Cryptocurrencies</option><option value="stocks" data-i18n="cat.stocks">Stocks</option><option value="energy" data-i18n="cat.energy">Energy</option><option value="metals" data-i18n="cat.metals">Metals</option><option value="indices" data-i18n="cat.indices">Indices</option></select>
-  <label data-i18n="inst.dataType">Data type</label><select id="insKind"><option value="crypto" data-i18n="inst.kindCrypto">crypto (BingX/Binance/Bybit/OKX)</option><option value="stock" data-i18n="inst.kindStock">exchange/commodity (Yahoo)</option></select>
-  <label data-i18n="inst.yahoo">Yahoo symbol (for stocks/commodities)</label><input id="insYahoo" placeholder="SOL-USD">
+  <label data-i18n="inst.category">Category</label><select id="insCat" onchange="syncInstKind()"><option value="crypto" data-i18n="cat.crypto">Cryptocurrencies</option><option value="stocks" data-i18n="cat.stocks">Stocks</option><option value="energy" data-i18n="cat.energy">Energy</option><option value="metals" data-i18n="cat.metals">Metals</option><option value="indices" data-i18n="cat.indices">Indices</option></select>
+  <label data-i18n="inst.dataType">Data type</label><select id="insKind" onchange="document.getElementById('insYahoo').dataset.auto='0'"><option value="crypto" data-i18n="inst.kindCrypto">crypto (BingX/Binance/Bybit/OKX)</option><option value="stock" data-i18n="inst.kindStock">exchange/commodity (Yahoo)</option></select>
+  <label data-i18n="inst.yahoo">Yahoo symbol (for stocks/commodities)</label><input id="insYahoo" placeholder="SOL-USD" oninput="this.dataset.auto='0'">
+  <div class="pxs" style="font-size:11px;color:var(--mut);margin:-2px 0 6px" data-i18n="inst.hint">For stocks and commodities use the Yahoo ticker (e.g. AAPL, GC=F, SPY). For crypto use the plain name (SOL).</div>
   <div class="row"><button onclick="closeModal('modalInst')" data-i18n="btn.cancel">Cancel</button>
   <button onclick="addInstrument()" style="background:var(--acc);color:#fff" data-i18n="btn.add">Add</button></div>
 </div></div>
 <div class="modal" id="modalAbout"><div class="box">
-  <h3>Rawanga Trading Desk <span style="font-size:11px;color:var(--mut);font-weight:400">v0.2.2</span></h3>
+  <h3>Rawanga Trading Desk <span style="font-size:11px;color:var(--mut);font-weight:400">v0.2.3</span></h3>
   <p style="font-size:12px;color:var(--mut)"><span data-i18n="about.tagline">Portable charting and signals terminal with algorithmic trading.</span><br>© 2026 Andrei Maltsev · Rawanga AI</p>
   <p style="font-size:12px">
     <span data-i18n="about.platforms">Platforms:</span> Windows · macOS · Linux · <span data-i18n="about.pwa">PWA app for smartphones and tablets</span><br>

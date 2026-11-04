@@ -66,11 +66,25 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # нужны аннотации тегов, не только коммиты
+
+      # Описание релиза берём из аннотации тега: иначе релиз публикуется с
+      # пустым телом, и его приходится заполнять руками после каждой сборки.
+      - name: Release notes from the tag annotation
+        id: notes
+        run: |
+          git tag -l --format='%(contents)' "$GITHUB_REF_NAME" > release_notes.md
+          echo "--- начало описания ---"
+          head -5 release_notes.md
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
       - uses: softprops/action-gh-release@v2
         with:
+          body_path: release_notes.md
           files: artifacts/**/*
           # Note: artifacts are NOT code-signed. macOS users: xattr -dr com.apple.quarantine;
           # Windows: SmartScreen warning. Clean distribution requires certificates (see README).

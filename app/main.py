@@ -428,7 +428,7 @@ async def trend(symbol: str, tf: str = "1h", limit: int = 500,
 # Trade-journal depth (candles). Was 500 (~20 days on 1h) — profitable trades
 # fell out of the sliding window and the journal showed a loss. Now 3000 candles.
 # Application version. Shown in /health and in the About window.
-APP_VERSION = "0.2.2"
+APP_VERSION = "0.2.3"
 
 JOURNAL_DEPTH = 3000
 

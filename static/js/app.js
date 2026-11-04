@@ -297,6 +297,22 @@ async function loadIndicators() {
 const oscColors = { rsi: '#b388ff', macd: '#2962ff', adx: '#ffd54f' };
 let oscSyncLock = false;
 
+// Persistent oscillator series: created once, redraw is setData only.
+function ensureOscSeries(c, kind) {
+  if (!c._s) c._s = {};
+  const S = c._s;
+  if (kind === 'rsi' && !S.line) {
+    S.line = c.addLineSeries({ color: oscColors.rsi, lineWidth: 2 });
+  } else if (kind === 'adx' && !S.line) {
+    S.line = c.addLineSeries({ color: oscColors.adx, lineWidth: 2 });
+  } else if (kind === 'macd') {
+    if (!S.hist) S.hist = c.addHistogramSeries({});
+    if (!S.macd) S.macd = c.addLineSeries({ color: '#2962ff', lineWidth: 1 });
+    if (!S.signal) S.signal = c.addLineSeries({ color: '#ff6d00', lineWidth: 1 });
+  }
+  return S;
+}
+
 function ensureOscChart(kind, el) {
   if (!oscCharts[kind]) {
     const c = LightweightCharts.createChart(el, {
@@ -346,11 +362,18 @@ function renderOsc(kind, j, t, on) {
     requestAnimationFrame(() => {
       try { c.applyOptions({ width: el.clientWidth, height: el.clientHeight }); } catch (e) {}
     });
-    c._series.forEach(s => c.removeSeries(s));
-    c._series = [];
-    const color = oscColors[kind];
+    // Series are created ONCE per pane and only setData afterwards.
+    // Recreating them on every redraw left the previous symbol's data on the
+    // canvas when removeSeries did not land — the pane looked like it always
+    // plotted BTC.
+    const S = ensureOscSeries(c, kind);
+    const has = (a) => Array.isArray(a) && a.some(v => v != null);
+    if (!has(j.rsi14) && kind === 'rsi') { S.line.setData([]); }
+    if (!has(j.macd) && !has(j.macd_hist) && kind === 'macd') {
+      S.hist.setData([]); S.macd.setData([]); S.signal.setData([]);
+    }
     if (kind === 'rsi') {
-      c._series.push(c.addLineSeries({ color, lineWidth: 2 }).setData(seriesData(j.rsi14, t)));
+      S.line.setData(seriesData(j.rsi14, t));
     } else if (kind === 'macd') {
       const hist = [];
       for (let i = 0; i < (j.macd_hist || []).length; i++) {
@@ -359,11 +382,11 @@ function renderOsc(kind, j, t, on) {
         hist.push({ time: Math.floor(t[i] / 1000), value: v,
           color: v >= 0 ? 'rgba(38,166,154,0.6)' : 'rgba(239,83,80,0.6)' });
       }
-      c._series.push(c.addHistogramSeries({}).setData(hist));
-      c._series.push(c.addLineSeries({ color: '#2962ff', lineWidth: 1 }).setData(seriesData(j.macd, t)));
-      c._series.push(c.addLineSeries({ color: '#ff6d00', lineWidth: 1 }).setData(seriesData(j.macd_signal, t)));
+      S.hist.setData(hist);
+      S.macd.setData(seriesData(j.macd, t));
+      S.signal.setData(seriesData(j.macd_signal, t));
     } else if (kind === 'adx') {
-      c._series.push(c.addLineSeries({ color, lineWidth: 2 }).setData(seriesData(j.adx, t)));
+      S.line.setData(seriesData(j.adx, t));
     }
     // sync ONLY the time range (visible logical range) with the main chart.
     // Do NOT touch rightOffset/bars and send no reverse events — the chart would drift.
@@ -377,6 +400,7 @@ function renderOsc(kind, j, t, on) {
 
 function seriesData(arr, times) {
   const out = [];
+  if (!Array.isArray(arr) || !Array.isArray(times)) return out;
   for (let i = 0; i < arr.length; i++) {
     if (arr[i] != null) out.push({ time: Math.floor(times[i] / 1000), value: arr[i] });
   }
@@ -585,7 +609,15 @@ async function loadInstruments() {
     const hdr = document.createElement('div');
     hdr.className = 'cat-hdr';
     hdr.innerHTML = `<span class="cat">${catTitles[cat] ? t(catTitles[cat]) : cat}</span><span class="plus" title="${t('misc.add')}">+</span>`;
-    hdr.querySelector('.plus').onclick = () => { document.getElementById('insCat').value = cat; openModal('modalInst'); };
+    hdr.querySelector('.plus').onclick = () => {
+      document.getElementById('insCat').value = cat;
+      document.getElementById('insSymbol').value = '';
+      document.getElementById('insTitle').value = '';
+      document.getElementById('insYahoo').value = '';
+      document.getElementById('insYahoo').dataset.auto = '1';
+      syncInstKind();                       // data type follows the category
+      openModal('modalInst');
+    };
     list.appendChild(hdr);
     for (const it of items) {
       const d = document.createElement('div');
@@ -806,17 +838,48 @@ async function addWebhook() {
   refreshWhList();
 }
 
+// The category decides the data type: only crypto goes through the crypto
+// cascade, everything else (stocks/energy/metals/indices) goes through Yahoo.
+function syncInstKind() {
+  const cat = document.getElementById('insCat').value;
+  const kindSel = document.getElementById('insKind');
+  const sym = document.getElementById('insSymbol').value.trim().toUpperCase();
+  const yEl = document.getElementById('insYahoo');
+  if (cat === 'crypto') {
+    kindSel.value = 'crypto';
+    if (!yEl.value || yEl.dataset.auto === '1') { yEl.value = sym ? sym + '-USD' : ''; yEl.dataset.auto = '1'; }
+  } else {
+    kindSel.value = 'stock';
+    if (!yEl.value || yEl.dataset.auto === '1') { yEl.value = sym; yEl.dataset.auto = '1'; }
+  }
+}
+
 async function addInstrument() {
+  const cat = document.getElementById('insCat').value;
+  const sym = document.getElementById('insSymbol').value.trim().toUpperCase();
+  // data type is derived from the category, not from whatever the select kept
+  const kind = cat === 'crypto' ? 'crypto' : 'stock';
+  const yInput = document.getElementById('insYahoo').value.trim();
   const body = {
-    symbol: document.getElementById('insSymbol').value,
-    title: document.getElementById('insTitle').value || document.getElementById('insSymbol').value,
-    category: document.getElementById('insCat').value,
-    kind: document.getElementById('insKind').value,
-    yahoo: document.getElementById('insYahoo').value || document.getElementById('insSymbol').value + '-USD',
+    symbol: sym,
+    title: document.getElementById('insTitle').value || sym,
+    category: cat,
+    kind,
+    yahoo: yInput || (kind === 'crypto' ? sym + '-USD' : sym),
   };
   const r = await fetch(`${API}/api/instruments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (r.ok) { closeModal('modalInst'); loadInstruments(); }
-  else { alert(t('misc.failed') + (await r.json()).detail); }
+  if (!r.ok) { alert(t('misc.failed') + (await r.json()).detail); return; }
+  closeModal('modalInst');
+  await loadInstruments();
+  // Warm the history right away: otherwise a newly added instrument has neither
+  // a price nor a 24h change until someone selects it by hand.
+  try {
+    await fetch(`${API}/api/bars/${body.symbol}?tf=${current.tf}&limit=500&refresh=true`);
+    // daily bars feed the 24h change column — without them it stays empty
+    await fetch(`${API}/api/bars/${body.symbol}?tf=1d&limit=3&refresh=true`);
+  } catch (e) { /* not critical */ }
+  await refreshPrice({ symbol: body.symbol });
+  loadChanges24();
 }
 
 async function removeInstrument(sym) {
@@ -827,8 +890,15 @@ async function removeInstrument(sym) {
 
 async function refreshPrice(it) {
   try {
-    const r = await fetch(`${API}/api/bars/${it.symbol}?tf=15m&limit=2&refresh=false`);
-    const j = await r.json();
+    // refresh=false reads the cache only. A new instrument has an empty cache,
+    // so fall back to a live fetch — otherwise the price never shows up.
+    let r = await fetch(`${API}/api/bars/${it.symbol}?tf=15m&limit=2&refresh=false`);
+    let j = await r.json();
+    if (!r.ok || !(j.bars || []).length) {
+      r = await fetch(`${API}/api/bars/${it.symbol}?tf=15m&limit=2&refresh=true`);
+      j = await r.json();
+    }
+    if (!(j.bars || []).length) return;
     const last = j.bars[j.bars.length - 1];
     const _sel = (window.CSS && CSS.escape) ? CSS.escape(it.symbol) : it.symbol.replace(/["\\]/g, '\\$&');
     document.querySelectorAll(`[data-px="${_sel}"]`).forEach(e => {
@@ -944,8 +1014,11 @@ async function loadBars(refresh, keepView) {
   if (cv) { cv._bins = computeBins(j.bars); syncHvolSize(); drawHorizontalVol(); }
   if (keepView && savedRange) {
     chart.timeScale().setVisibleLogicalRange(savedRange);
-  } else {
-    chart.timeScale().fitContent();
+  } else if ((j.bars || []).length) {
+    // NOT fitContent and NOT setVisibleLogicalRange: both set the number of
+    // visible bars and override barSpacing, squeezing the candle into a thread.
+    // scrollToRealTime only scrolls to the last bar, leaving spacing intact.
+    chart.timeScale().scrollToRealTime();
   }
   document.getElementById('status').textContent = t('misc.bars', { symbol: symbol, title: j.title, count: j.count });
   document.getElementById('srcline').textContent = t('misc.source', { src: j.source });
@@ -1453,7 +1526,10 @@ async function refreshTkList() {
     const d = document.createElement('div');
     d.className = 'tk' + (t.enabled ? '' : ' off');
     const _s = esc(t.symbol);
-    d.innerHTML = `<span>${t.enabled ? '✅' : '⛔'} <b>${_s}</b> · ${esc(t.bingx_symbol)} · ${esc(t.category || '')}`
+    // Price and 24h change use the same data attributes as the instrument list;
+    // refreshPrice() and loadChanges24() fill them in.
+    d.innerHTML = `<span>${t.enabled ? '✅' : '⛔'} <b>${_s}</b> · ${esc(t.bingx_symbol)} · ${esc(t.category || '')}</span>`
+      + `<span class="tknum"><span class="px" data-px="${_s}">—</span>`
       + `<span class="chg zero" data-chg="${_s}">—</span></span>`;
     const box = document.createElement('span');
     const tg = document.createElement('span'); tg.className = 'icn'; tg.textContent = t.enabled ? '⏸' : '▶'; tg.title = t2('tickers.toggle');
@@ -1462,6 +1538,8 @@ async function refreshTkList() {
     del.onclick = async () => { if (!confirm(t2('tickers.remove', { sym: t.symbol }))) return; await fetch(`${API}/api/trade/tickers/${t.symbol}`, { method: 'DELETE' }); refreshTkList(); };
     box.append(tg, del); d.appendChild(box); el.appendChild(d);
   });
+  // prices and changes for the same symbols as in the instrument list
+  tkCache.forEach(t => refreshPrice({ symbol: t.symbol }));
   loadChanges24();
 }
 
