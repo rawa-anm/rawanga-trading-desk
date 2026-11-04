@@ -34,6 +34,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          # Hyperliquid trading needs its optional extra. Without it the driver
+          # is bundled but signing fails at runtime with "SDK is not installed",
+          # so the shipped binaries must include it.
+          pip install -r requirements-hl.txt
           pip install pyinstaller
 
       - name: Build (PyInstaller onedir)
