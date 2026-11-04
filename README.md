@@ -16,6 +16,8 @@ data is stored next to the application (`data/`).
 
 - **Installation & usage (RTFM):** [English](docs/rtfm.en.md) · [Español](docs/rtfm.es.md) · [Русский](docs/rtfm.ru.md)
 - **Writing strategies:** [English](docs/strategies.en.md) · [Español](docs/strategies.es.md) · [Русский](docs/strategies.ru.md)
+- **Switching between exchanges:** [English](docs/exchanges.en.md) · [Español](docs/exchanges.es.md) · [Русский](docs/exchanges.ru.md)
+- **Running on a cloud server (hardening):** [English](docs/cloud.en.md) · [Español](docs/cloud.es.md) · [Русский](docs/cloud.ru.md)
 
 ## Features
 
@@ -25,7 +27,8 @@ data is stored next to the application (`data/`).
 - Strategy editor and back-testing engine (Python, sandboxed).
 - Signals / webhooks to Telegram (optional).
 - Optional e-mail alerts to your own mailbox (SMTP; personal, single recipient).
-- BingX exchange integration (disabled by default; keys are stored encrypted).
+- Exchange integration: BingX and Hyperliquid (disabled by default; keys are stored
+  encrypted, one exchange active at a time — see the switching guide).
 
 ## Run from source
 

@@ -20,6 +20,15 @@ hidden = (
     + ["app.main", "app.launcher", "aiosqlite", "websockets", "httpx", "certifi"]
 )
 
+# Hyperliquid is OPTIONAL (requirements-hl.txt). Collect it only when present, so
+# a build without the extra still succeeds instead of failing on a missing module.
+try:
+    hidden += collect_submodules("hyperliquid")
+    hidden += collect_submodules("eth_account")
+    hidden.append("msgpack")
+except Exception:
+    pass
+
 datas = [
     ("static", "static"),
     ("strategies", "strategies"),

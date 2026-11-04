@@ -150,7 +150,7 @@
 <header>
   <h1>🔧 Rawanga Trading Desk</h1>
   <span class="badge" id="status" data-i18n="status.loading">loading…</span>
-  <span class="brand"><a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a> · <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener" data-i18n="brand.trade">Trade on BingX</a></span>
+  <span class="brand"><a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a> · <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener" data-i18n="brand.trade">Trade on BingX</a> · <a href="https://app.hyperliquid.xyz/join/RAWA" target="_blank" rel="noopener" data-i18n="brand.tradeHl">Trade on Hyperliquid</a></span>
   <div class="toolbar">
     <select id="langsel" title="Language" style="width:auto">
       <option value="en">EN</option>
@@ -257,12 +257,31 @@
   <div class="row"><button onclick="closeModal('modalDocs')" data-i18n="btn.close">Close</button></div>
 </div></div>
 <div class="modal" id="modalTrade"><div class="box">
-  <h3 data-i18n="trade.title">BingX trading (futures / swap)</h3>
+  <h3 data-i18n="trade.title">Real trading</h3>
+  <label data-i18n="trade.exchange">Exchange (exactly one is traded on)</label>
+  <select id="trExchange">
+    <option value="bingx">BingX</option>
+    <option value="hyperliquid">Hyperliquid</option>
+  </select>
+  <div id="trSwitchWarn" class="pxs" style="display:none;color:var(--dn);font-size:11px;margin:-2px 0 6px" data-i18n="trade.switchWarn">Close all positions on the current exchange before switching: positions on the inactive exchange are not tracked by the app.</div>
   <div id="trWarn" class="badge" style="margin-bottom:8px"></div>
+
+  <div id="exPaneBingx">
   <label><span data-i18n="trade.apiKey">API Key</span> (<span id="trKeyMask">—</span>)</label><input id="trApiKey" autocomplete="off" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
   <label data-i18n="trade.secret">Secret Key</label><input id="trSecret" type="password" autocomplete="new-password" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
   <label data-i18n="trade.fundPw">Fund password (required for real trading)</label><input id="trFundPw" type="password" autocomplete="new-password" data-i18n-ph="trade.fundPwPh" placeholder="confirmation to enable live">
   <label data-i18n="trade.env">Environment</label><select id="trEnv"><option value="live" data-i18n="trade.envLive">Live</option><option value="vst" data-i18n="trade.envVst">Simulation (testnet VST)</option></select>
+  </div>
+
+  <div id="exPaneHl" style="display:none">
+  <div class="pxs" style="font-size:11px;color:var(--mut);margin:-2px 0 6px" data-i18n="trade.hlNote">Trading uses an API wallet (agent), not the account key. Create it at app.hyperliquid.xyz/API and paste the MASTER account address plus the AGENT private key.</div>
+  <label><span data-i18n="trade.hlAddress">Master account address</span> (<span id="trHlAddrMask">—</span>)</label><input id="trHlAddress" autocomplete="off" placeholder="0x…">
+  <label data-i18n="trade.hlPk">Agent wallet private key</label><input id="trHlPk" type="password" autocomplete="new-password" data-i18n-ph="trade.keepPh" placeholder="leave empty to keep unchanged">
+  <label data-i18n="trade.env">Environment</label><select id="trHlEnv"><option value="mainnet">Mainnet</option><option value="testnet">Testnet</option></select>
+  <div class="row" style="justify-content:flex-start;margin-top:6px"><button onclick="testHl()" data-i18n="trade.hlTest">Check connection</button></div>
+  <div id="trHlResult" class="pxs" style="font-size:11px;margin-top:4px"></div>
+  </div>
+
   <label data-i18n="trade.lev">Leverage (1–125)</label><input id="trLev" type="number" min="1" max="125" value="5">
   <label data-i18n="trade.pct">% of balance per position</label><input id="trPct" type="number" min="0.1" step="0.1" value="10">
   <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
@@ -321,7 +340,7 @@
   <div class="row"><button onclick="closeModal('modalAbout')" data-i18n="btn.close">Close</button></div>
 </div></div>
 <footer class="appfoot">
-  <div>© 2026 Andrei Maltsev · Rawanga AI · <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a> · <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener" data-i18n="brand.trade">Trade on BingX</a></div>
+  <div>© 2026 Andrei Maltsev · Rawanga AI · <a href="https://rawanga.es" target="_blank" rel="noopener">rawanga.es</a> · <a href="https://bingx.com/partner/rawa/" target="_blank" rel="noopener" data-i18n="brand.trade">Trade on BingX</a> · <a href="https://app.hyperliquid.xyz/join/RAWA" target="_blank" rel="noopener" data-i18n="brand.tradeHl">Trade on Hyperliquid</a></div>
 </footer>
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/lightweight-charts.standalone.production.js"></script>

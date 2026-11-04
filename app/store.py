@@ -293,6 +293,7 @@ DEFAULT_TRADE_SETTINGS = {
     "leverage": "5",       # leverage for swap positions
     "entry_pct": "10",     # % of free balance per position
     "pnl_start": "",       # YYYY-MM-DD — start of the PnL history (empty = all)
+    "exchange": "bingx",   # active trading backend: bingx | hyperliquid
 }
 
 
@@ -316,7 +317,7 @@ async def get_trade_settings() -> dict:
 
 async def set_trade_settings(fields: dict):
     async with aiosqlite.connect(DB) as db:
-        for k in ("live_enabled", "leverage", "entry_pct", "pnl_start"):
+        for k in ("live_enabled", "leverage", "entry_pct", "pnl_start", "exchange"):
             if k not in fields or fields[k] is None:
                 continue
             v = fields[k]

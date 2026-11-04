@@ -1,0 +1,6 @@
+# Optional extra: real trading on Hyperliquid.
+# The base app works without these; install them only if you trade on HL.
+#   pip install -r requirements-hl.txt
+hyperliquid-python-sdk==0.24.0
+eth-account==0.13.7
+msgpack==1.2.4

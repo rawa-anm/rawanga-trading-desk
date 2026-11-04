@@ -76,6 +76,11 @@ SECRETS_PATH = DATA_DIR / "bx_secrets.enc"
 SECRET_KEY_PATH = DATA_DIR / "bx_secret.key"
 USDTD_HISTORY_PATH = DATA_DIR / "usdtd_history.json"
 
+# Hyperliquid secrets live in their OWN files: a leak of one exchange's keys
+# must not expose the other one.
+HL_SECRETS_PATH = DATA_DIR / "hl_secrets.enc"
+HL_SECRET_KEY_PATH = DATA_DIR / "hl_secret.key"
+
 # ── Application links (About window / footer) ──
 SITE_URL = "https://rawanga.es"
 PARTNER_URL = "https://bingx.com/partner/rawa/"

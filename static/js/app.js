@@ -1094,6 +1094,24 @@ async function openTrade() {
   document.getElementById('trEnv').value = keys.env || 'live';
   document.getElementById('trLev').value = settings.leverage;
   document.getElementById('trPct').value = settings.entry_pct;
+  // Exchange switch: exactly one backend is active.
+  const exSel = document.getElementById('trExchange');
+  const act = keys.exchange || settings.exchange || 'bingx';
+  _curExchange = act;
+  if (exSel) exSel.value = act;
+  syncExchangePanes(act);
+  // Hyperliquid key summary
+  const hl = keys.hyperliquid || {};
+  const hlMask = document.getElementById('trHlAddrMask');
+  if (hlMask) hlMask.textContent = hl.account_masked || '—';
+  const hlAddr = document.getElementById('trHlAddress');
+  if (hlAddr) hlAddr.value = '';
+  const hlPk = document.getElementById('trHlPk');
+  if (hlPk) hlPk.value = '';
+  const hlEnv = document.getElementById('trHlEnv');
+  if (hlEnv) hlEnv.value = hl.env === 'testnet' ? 'testnet' : 'mainnet';
+  const hlRes = document.getElementById('trHlResult');
+  if (hlRes) hlRes.textContent = hl.error ? ('⚠️ ' + hl.error) : '';
   // Real-trade alerts: bot token + recipient TG id
   document.getElementById('trTgMask').textContent = keys.notify_token_masked || '—';
   document.getElementById('trNotifyToken').value = '';
@@ -1109,12 +1127,68 @@ async function openTrade() {
   openModal('modalTrade');
 }
 
+// Which backend is active right now — to detect a real switch (vs. just saving).
+let _curExchange = 'bingx';
+
+// Show only the key pane of the selected exchange.
+function syncExchangePanes(name) {
+  const bxPane = document.getElementById('exPaneBingx');
+  const hlPane = document.getElementById('exPaneHl');
+  if (bxPane) bxPane.style.display = name === 'hyperliquid' ? 'none' : '';
+  if (hlPane) hlPane.style.display = name === 'hyperliquid' ? '' : 'none';
+  const sw = document.getElementById('trSwitchWarn');
+  if (sw) sw.style.display = (name !== _curExchange) ? 'block' : 'none';
+}
+
+// Hyperliquid connection check — read-only, no orders.
+async function testHl() {
+  const el = document.getElementById('trHlResult');
+  if (el) { el.textContent = '…'; el.style.color = 'var(--mut)'; }
+  const body = {};
+  const a = document.getElementById('trHlAddress');
+  const k = document.getElementById('trHlPk');
+  const e = document.getElementById('trHlEnv');
+  if (a && a.value.trim()) body.account_address = a.value.trim();
+  if (k && k.value.trim()) body.api_private_key = k.value.trim();
+  if (e) body.hl_env = e.value;
+  const r = await fetch(`${API}/api/trade/hl/test`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!el) return;
+  if (r.ok && j.ok) {
+    el.style.color = 'var(--up)';
+    el.textContent = '✅ ' + (j.balance ? (j.balance.equity + ' USDC · ' + (j.balance.mode || '')) : 'connected') +
+      ' · positions: ' + j.positions + ' · env: ' + j.env;
+  } else {
+    el.style.color = 'var(--dn)';
+    el.textContent = '❌ ' + (j.detail || JSON.stringify(j));
+  }
+}
+
 async function saveTrade() {
   const body = {
     leverage: parseInt(document.getElementById('trLev').value) || 5,
     entry_pct: parseFloat(document.getElementById('trPct').value) || 10,
     env: document.getElementById('trEnv').value,
   };
+  // Active exchange. A real switch must be confirmed explicitly when live
+  // trading is on: positions on the old exchange stop being tracked.
+  const exSel = document.getElementById('trExchange');
+  if (exSel) {
+    body.exchange = exSel.value;
+    if (exSel.value !== _curExchange) {
+      const ok = confirm(t('trade.switchConfirm', { from: _curExchange, to: exSel.value }));
+      if (!ok) return;
+      body.confirm_switch = true;
+    }
+  }
+  // Hyperliquid keys: master account address + agent private key.
+  const hlAddr = document.getElementById('trHlAddress');
+  const hlPkEl = document.getElementById('trHlPk');
+  const hlEnvEl = document.getElementById('trHlEnv');
+  if (hlAddr && hlAddr.value.trim()) body.account_address = hlAddr.value.trim();
+  if (hlPkEl && hlPkEl.value.trim()) body.api_private_key = hlPkEl.value.trim();
+  if (hlEnvEl) body.hl_env = hlEnvEl.value;
   const ak = document.getElementById('trApiKey').value.trim();
   const sk = document.getElementById('trSecret').value.trim();
   const fp = document.getElementById('trFundPw').value;

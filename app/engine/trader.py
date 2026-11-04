@@ -30,6 +30,7 @@ import logging
 import time
 
 from app import exchange as ex
+from app import broker
 from app import store
 from app.engine import webhooks as wh
 from app.engine import mailer as mail
@@ -59,7 +60,7 @@ async def _notify(text: str, client=None) -> None:
 
     Telegram (bot token + chat_id) and/or e-mail (SMTP) — whichever is set.
     """
-    cfg = ex.notify_cfg()
+    cfg = broker.notify_cfg()
     token = cfg.get("token") or None
     chat = str(cfg.get("chat_id") or PRIVATE_CHAT)
     sent_any = False
@@ -73,7 +74,7 @@ async def _notify(text: str, client=None) -> None:
         except Exception as e:  # noqa: BLE001
             log.warning("trade notify failed: %s", e)
     # E-mail channel (optional, the user's own SMTP server).
-    mcfg = ex.mail_cfg()
+    mcfg = broker.mail_cfg()
     if mcfg.get("host") and mcfg.get("to"):
         try:
             r = await mail.send_email(mcfg, "Rawanga Trading Desk — trade alert", text)
@@ -92,7 +93,7 @@ async def _notional_usdt(client) -> float | None:
     s = await store.get_trade_settings()
     if not s.get("live_enabled"):
         return None
-    bal = await ex.balance(client=client)
+    bal = await broker.balance(client=client)
     if not bal:
         return None
     try:
@@ -116,26 +117,26 @@ async def execute_deal(deal: dict, meta: dict, tf: str, client=None) -> dict | N
         return None
     if not await store.is_trade_enabled(sym):
         return None
-    if not ex.masked_keys()["has_keys"]:
+    if not broker.masked_keys()["has_keys"]:
         return None
 
-    bx = ex.bingx_symbol(sym)
+    sym_ex = broker.exchange_symbol(sym)
     kind = deal["kind"]
-    hedge = await ex.is_hedge_mode(client)
+    hedge = await broker.is_hedge_mode(client)
     try:
         if kind == "open":
             lev = int(s.get("leverage", 1)) or 1
             # Explicitly set leverage (without an explicit one BingX may apply the maximum),
             # then CHECK that it was actually applied,
             # otherwise we do NOT send the order.
-            await ex.set_leverage(bx, lev, client=client)
-            chk = await ex.get_leverage(bx, client=client)
+            await broker.set_leverage(sym_ex, lev, client=client)
+            chk = await broker.get_leverage(sym_ex, client=client)
             cur_long = int(chk.get("longLeverage", 0) or 0)
             cur_short = int(chk.get("shortLeverage", 0) or 0)
             want = cur_long if deal["side"] == "long" else cur_short
             if want != lev:
-                log.error("leverage not applied %s: want=%s got L=%s S=%s", bx, lev, cur_long, cur_short)
-                await store.log_exec(sym, bx, "open", deal.get("side"), None, deal.get("close"),
+                log.error("leverage not applied %s: want=%s got L=%s S=%s", sym_ex, lev, cur_long, cur_short)
+                await store.log_exec(sym, sym_ex, "open", deal.get("side"), None, deal.get("close"),
                                      0, f"leverage mismatch want={lev} L={cur_long} S={cur_short}", "")
                 await _notify(f"⚠️ <b>LIVE · order NOT sent</b> {sym}\nleverage not applied: expected {lev}, L={cur_long} S={cur_short}", client=client)
                 return None
@@ -146,7 +147,7 @@ async def execute_deal(deal: dict, meta: dict, tf: str, client=None) -> dict | N
             # on entry, or on the opposite side (leftover from a reversal) —
             # we do NOT open a new one until it is clean. First close the opposite.
             try:
-                _pos = await ex.positions(bx, client=client)
+                _pos = await broker.positions(sym_ex, client=client)
                 mine = [p for p in _pos if float(p.get("positionAmt") or 0) != 0
                         and (p.get("positionSide") == pos_side or not hedge)]
                 if mine:
@@ -156,8 +157,8 @@ async def execute_deal(deal: dict, meta: dict, tf: str, client=None) -> dict | N
                            and p.get("positionSide") == opp]
                 if opp_pos:
                     log.info("trade %s: closing opposite %s before open %s", sym, opp, pos_side)
-                    await ex.close_position(bx, opp, client=client)
-                    _pos2 = await ex.positions(bx, client=client)
+                    await broker.close_position(sym_ex, opp, client=client)
+                    _pos2 = await broker.positions(sym_ex, client=client)
                     still = [p for p in _pos2 if float(p.get("positionAmt") or 0) != 0
                              and p.get("positionSide") == opp]
                     if still:
@@ -171,22 +172,22 @@ async def execute_deal(deal: dict, meta: dict, tf: str, client=None) -> dict | N
                 log.warning("trade skip %s: notional<=0", sym)
                 return None
             side = "BUY" if deal["side"] == "long" else "SELL"
-            r = await ex.place_market(bx, side, pos_side, quote_usdt=notional, client=client)
+            r = await broker.place_market(sym_ex, side, pos_side, quote_usdt=notional, client=client)
             ok = r.get("code") == 0
-            await store.log_exec(sym, bx, "open", side, notional, deal.get("close"),
+            await store.log_exec(sym, sym_ex, "open", side, notional, deal.get("close"),
                                  ok, r.get("msg"), json.dumps(r)[:2000])
-            log.info("trade OPEN %s %s %s notional=%.2f ok=%s", sym, side, bx, notional, ok)
+            log.info("trade OPEN %s %s %s notional=%.2f ok=%s", sym, side, sym_ex, notional, ok)
             # Notification about the live trade
             await _notify(_fmt(sym, "open", side, deal.get("close"), notional,
-                               extra=f"leverage: {lev}× · {bx}"), client=client)
+                               extra=f"leverage: {lev}× · {sym_ex}"), client=client)
             return r if ok else {"_status": "error"}
         elif kind == "close":
             pos_side = ("LONG" if deal.get("side") == "long" else "SHORT") if hedge else "BOTH"
-            r = await ex.close_position(bx, pos_side, client=client)
+            r = await broker.close_position(sym_ex, pos_side, client=client)
             ok = r.get("code") == 0
-            await store.log_exec(sym, bx, "close", deal.get("side"), None, deal.get("close"),
+            await store.log_exec(sym, sym_ex, "close", deal.get("side"), None, deal.get("close"),
                                  ok, r.get("msg"), json.dumps(r)[:2000])
-            log.info("trade CLOSE %s %s ok=%s", sym, bx, ok)
+            log.info("trade CLOSE %s %s ok=%s", sym, sym_ex, ok)
             reason = deal.get("reason")
             extra = f"reason: {reason}" if reason else ""
             pl = deal.get("trade", {}).get("pl_pct") if deal.get("trade") else None
@@ -196,7 +197,7 @@ async def execute_deal(deal: dict, meta: dict, tf: str, client=None) -> dict | N
                                extra=extra), client=client)
             return r if ok else {"_status": "error"}
     except Exception as e:  # noqa: BLE001
-        await store.log_exec(sym, bx, kind, deal.get("side"), None, deal.get("close"),
+        await store.log_exec(sym, sym_ex, kind, deal.get("side"), None, deal.get("close"),
                              0, str(e), "")
         log.warning("trade %s %s failed: %s", kind, sym, e)
         await _notify(f"⚠️ <b>LIVE · error {kind}</b> {sym}\n{e}", client=client)

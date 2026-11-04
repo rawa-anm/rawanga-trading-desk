@@ -38,6 +38,8 @@ from app.datafeed import cache
 from app.datafeed.sources import fetch_ohlcv, TFS as VALID_TFS
 from app.engine import signals as eng
 from app import exchange as ex
+from app import exchange_hl as ex_hl
+from app import broker
 from app.engine import strategy as strat_mod
 from app.engine import trades as tr_trades
 from app.engine import runner as rn
@@ -79,6 +81,13 @@ async def lifespan(app: FastAPI):
     await store.init()
     await store.seed(INSTRUMENTS)
     app.state.client = httpx.AsyncClient(timeout=15.0)
+    # Restore the active exchange from settings: exactly one is traded on.
+    try:
+        _ts = await store.get_trade_settings()
+        _act = broker.set_active(_ts.get("exchange", "bingx"))
+        log.info("exchange backend: %s", _act)
+    except Exception as e:  # noqa: BLE001
+        log.warning("exchange backend init failed: %s", e)
     # Load user strategies into the engine (state/strategies.json)
     try:
         n = await strategy_load_saved()
@@ -140,14 +149,19 @@ async def change_24h():
     rows = await store.list_instruments()
     out: dict[str, dict] = {}
 
+    # The batch ticker endpoint exists on BingX only. When Hyperliquid is the
+    # active backend, showing BingX prices here would be a different market from
+    # the one being traded — so we skip it and let every symbol fall through to
+    # the cache (daily bars), which is exchange-agnostic.
     bx_map: dict[str, str] = {}
-    for r in rows:
-        if r.get("category") != "crypto":
-            continue
-        try:
-            bx_map[ex.bingx_symbol(r["symbol"])] = r["symbol"]
-        except Exception:  # noqa: BLE001
-            pass
+    if broker.active() == "bingx":
+        for r in rows:
+            if r.get("category") != "crypto":
+                continue
+            try:
+                bx_map[ex.bingx_symbol(r["symbol"])] = r["symbol"]
+            except Exception:  # noqa: BLE001
+                pass
     if bx_map:
         try:
             d = await ex.request("GET", "/openApi/swap/v2/quote/ticker",
@@ -741,7 +755,9 @@ async def test_signal(payload: dict):
 
 @app.get("/api/trade/settings")
 async def trade_settings_get():
-    return {"settings": await store.get_trade_settings(), "keys": ex.masked_keys()}
+    return {"settings": await store.get_trade_settings(),
+            "keys": broker.masked_keys(),
+            "active": broker.active()}
 
 
 @app.post("/api/trade/settings")
@@ -756,31 +772,107 @@ async def trade_settings_set(payload: dict):
         cur = ex.load_secrets()
         cur.update(keys)
         ex.save_secrets(cur)
-    # Protection: real trading cannot be enabled without the fund password.
+
+    # ── Hyperliquid keys: master account address + agent private key ──
+    # NOTE: the form sends "hl_env" while the driver reads "env" (which is also
+    # the BingX key name in the other panel). Writing it as "hl_env" would be
+    # silently ignored and the HL environment would stay mainnet forever.
+    hkeys = {k: payload[k] for k in ("account_address", "api_private_key")
+             if k in payload and payload.get(k) not in (None, "")}
+    hl_env_val = payload.get("hl_env")
+    if hl_env_val not in (None, ""):
+        hkeys["env"] = "testnet" if str(hl_env_val).lower() == "testnet" else "mainnet"
+    if hkeys:
+        cur = ex_hl.load_secrets()
+        cur.update(hkeys)
+        ex_hl.save_secrets(cur)
+        broker.reset_clients()      # keys changed — recreate the SDK
+
+    # ── Switching the active exchange ──
+    # Exactly one exchange is traded on. With live trading ON the switch needs
+    # an explicit confirmation: positions on the old exchange would be left
+    # unmanaged by the app.
+    want = str(payload.get("exchange", "")).strip().lower()
+    switching = want in broker.VALID and want != broker.active()
+    if switching:
+        if (await store.get_trade_settings()).get("live_enabled") and not (
+                payload.get("confirm_switch") or payload.get("confirm")):
+            raise HTTPException(
+                400,
+                f"Real trading is ON. Close positions on {broker.active()} and "
+                f"confirm switching the exchange to {want} (confirm_switch).")
+        broker.set_active(want)
+
+    # Protection: real trading cannot be enabled without the active exchange's keys.
     live_req = payload.get("live_enabled") in (True, "1", "true", "True", "on")
     if live_req:
-        s = ex.load_secrets()
-        if not (s.get("api_key") and s.get("secret_key")):
-            raise HTTPException(400, "Save the API keys first")
-        if not s.get("fund_password"):
-            raise HTTPException(400, "Set the fund password — real trading cannot be enabled without it")
-        if not (payload.get("fund_password") or payload.get("confirm")):
-            raise HTTPException(400, "Confirm enabling real trading with the fund password")
+        act = broker.active()
+        if not broker.masked_keys().get("has_keys"):
+            raise HTTPException(400, f"Save the API keys for {act} first")
+        if act == "bingx":
+            s = ex.load_secrets()
+            if not s.get("fund_password"):
+                raise HTTPException(400, "Set the fund password — real trading cannot be enabled without it")
+            if not (payload.get("fund_password") or payload.get("confirm")):
+                raise HTTPException(400, "Confirm enabling real trading with the fund password")
     await store.set_trade_settings(payload)
+    # Settings may have changed the exchange choice — sync process state.
+    broker.set_active((await store.get_trade_settings()).get("exchange", broker.active()))
     return {"ok": True, "settings": await store.get_trade_settings(),
-            "keys": ex.masked_keys()}
+            "keys": broker.masked_keys(), "active": broker.active()}
 
 
 @app.post("/api/trade/keys/clear")
 async def trade_keys_clear():
-    ex.save_secrets({})
-    return {"ok": True, "keys": ex.masked_keys()}
+    """Clear the keys of the ACTIVE exchange only — the other one keeps its own."""
+    if broker.active() == "hyperliquid":
+        ex_hl.save_secrets({})
+        broker.reset_clients()
+    else:
+        ex.save_secrets({})
+    return {"ok": True, "keys": broker.masked_keys(), "active": broker.active()}
+
+
+@app.post("/api/trade/hl/test")
+async def trade_hl_test(payload: dict | None = None):
+    """Hyperliquid connection check. Read-only — no orders are sent.
+
+    Accepts keys in the body, so they can be checked BEFORE saving: otherwise
+    the user enters an address and a key, presses "Check", and gets "not set",
+    simply because storage is still empty.
+    """
+    payload = payload or {}
+    supplied = {k: payload[k] for k in ("account_address", "api_private_key")
+                if payload.get(k) not in (None, "")}
+    if supplied:
+        cur = ex_hl.load_secrets()
+        cur.update(supplied)
+        env_v = payload.get("hl_env")
+        if env_v not in (None, ""):
+            cur["env"] = "testnet" if str(env_v).lower() == "testnet" else "mainnet"
+        ex_hl.save_secrets(cur)
+        broker.reset_clients()
+
+    s_hl = ex_hl.load_secrets()
+    if not (s_hl.get("account_address") and s_hl.get("api_private_key")):
+        raise HTTPException(400, "Hyperliquid: account address and/or agent private key are not set")
+    try:
+        bal = await ex_hl.balance(client=app.state.client)
+        pos = await ex_hl.positions(client=app.state.client)
+        px = await ex_hl.price("BTC", client=app.state.client)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Hyperliquid: {e}")
+    if bal is None:
+        raise HTTPException(502, "Hyperliquid: empty account response — check that the "
+                                 "MASTER account address is used, not the agent one")
+    return {"ok": True, "balance": bal, "positions": len(pos),
+            "btc_price": px, "env": s_hl.get("env", "mainnet")}
 
 
 @app.post("/api/trade/test-notify")
 async def trade_test_notify():
     """Test trade alert to the configured channels (Telegram and/or e-mail)."""
-    cfg = ex.notify_cfg()
+    cfg = broker.notify_cfg()
     chat = str(cfg.get("chat_id") or wh.DEFAULT_CHAT)
     text = "🔧 <b>Rawanga Trading Desk</b> — trade alert test"
     out = {"telegram": None, "email": None}
@@ -816,11 +908,13 @@ async def trade_tickers_add(payload: dict):
         cat = meta.get("category", "crypto")
     except Exception:  # noqa: BLE001
         cat = payload.get("category", "crypto")
-    bx = payload.get("bingx_symbol") or ex.bingx_symbol(sym)
+    # The stored column keeps its historical name (bingx_symbol) but holds the
+    # symbol of the ACTIVE exchange, so switching back and forth stays coherent.
+    bx = payload.get("bingx_symbol") or broker.exchange_symbol(sym)
     ok = await store.add_trade_ticker(sym, cat, bx)
     if not ok:
         raise HTTPException(409, f"{sym} is already in the list")
-    return {"added": sym, "bingx_symbol": bx}
+    return {"added": sym, "bingx_symbol": bx, "exchange": broker.active()}
 
 
 @app.post("/api/trade/tickers/{symbol}/toggle")
@@ -837,7 +931,7 @@ async def trade_tickers_del(symbol: str):
 async def trade_available():
     """Which of our instruments exist as a BingX swap contract (UI hint)."""
     try:
-        cs = await ex.contracts(client=app.state.client)
+        cs = await broker.contracts(client=app.state.client)
         have = {c.get("symbol") for c in cs}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"BingX contracts: {e}")
@@ -846,10 +940,10 @@ async def trade_available():
     for r in rows:
         if r["category"] == "trend":
             continue
-        bx = ex.bingx_symbol(r["symbol"])
+        bx = broker.exchange_symbol(r["symbol"])
         out.append({"symbol": r["symbol"], "category": r["category"],
                     "bingx_symbol": bx, "available": bx in have})
-    return {"available": out}
+    return {"available": out, "exchange": broker.active()}
 
 
 @app.get("/api/trade/account")
@@ -860,11 +954,12 @@ async def trade_account():
     otherwise the entire available history is walked. Without a start time the
     exchange returns only the last 7 days and the total silently understates.
     """
-    if not ex.masked_keys()["has_keys"]:
-        return {"connected": False, "error": "API keys are not set"}
+    if not broker.masked_keys()["has_keys"]:
+        return {"connected": False, "error": "API keys are not set",
+                "exchange": broker.active()}
     try:
-        bal = await ex.balance(client=app.state.client)
-        pos = await ex.positions(client=app.state.client)
+        bal = await broker.balance(client=app.state.client)
+        pos = await broker.positions(client=app.state.client)
         settings = await store.get_trade_settings()
         start_ms = None
         start = (settings.get("pnl_start") or "").strip()
@@ -874,7 +969,7 @@ async def trade_account():
                 start_ms = int(_dt.datetime.fromisoformat(start).timestamp() * 1000)
             except ValueError:
                 log.warning("pnl_start is not a date: %r — using full history", start)
-        pnl = await ex.pnl_history(client=app.state.client, start_ms=start_ms)
+        pnl = await broker.pnl_history(client=app.state.client, start_ms=start_ms)
     except Exception as e:  # noqa: BLE001
         return {"connected": False, "error": str(e)}
     return {
@@ -902,13 +997,13 @@ async def trade_close(symbol: str):
     """Manual position close at market price (traded tickers only)."""
     if not await store.is_trade_enabled(symbol):
         raise HTTPException(403, f"{symbol} is not in the traded list")
-    bx = ex.bingx_symbol(symbol)
-    pos = await ex.positions(bx, client=app.state.client)
+    bx = broker.exchange_symbol(symbol)
+    pos = await broker.positions(bx, client=app.state.client)
     closed = []
     for p in pos:
         if float(p.get("positionAmt", 0) or 0) == 0:
             continue
-        r = await ex.close_position(bx, p.get("positionSide", "BOTH"), client=app.state.client)
+        r = await broker.close_position(bx, p.get("positionSide", "BOTH"), client=app.state.client)
         await store.log_exec(symbol, bx, "close", p.get("positionSide"), None, None,
                              r.get("code") == 0, r.get("msg"), json.dumps(r))
         closed.append(r)
