@@ -1022,6 +1022,8 @@ async function loadBars(refresh, keepView) {
   }
   document.getElementById('status').textContent = t('misc.bars', { symbol: symbol, title: j.title, count: j.count });
   document.getElementById('srcline').textContent = t('misc.source', { src: j.source });
+  // drawings: bars for the magnet, and a repaint after the new data
+  if (window.DrawTools) { try { DrawTools.refresh(j.bars); } catch (e) {} }
   await loadIndicators();
 }
 
@@ -1556,6 +1558,8 @@ async function addTicker() {
 // Re-render dynamic (JS-generated) content when the language changes.
 window.onLangChange = () => {
   try { loadInstruments(); } catch (e) {}
+  // drawing layer builds its toolbar once — relabel it for the new language
+  if (window.DrawTools && DrawTools.relabel) { try { DrawTools.relabel(); } catch (e) {} }
   const jr = document.getElementById('journal');
   if (jr && jr.classList.contains('on')) openJournal(current.symbol);
   const docs = document.getElementById('modalDocs');
@@ -1566,6 +1570,12 @@ window.onLangChange = () => {
 (async function main() {
   initTheme();
   initChart(); initTfBar();
+  // Drawing tools: canvas layer above the chart (bars feed the OHLC magnet)
+  if (window.DrawTools) {
+    try {
+      DrawTools.init({ chart, series: candleSeries, host: document.getElementById('chart') });
+    } catch (e) { console.warn('draw tools failed', e); }
+  }
   applyMobileChartDensity();
   await loadInstruments();
   await loadStrategies();

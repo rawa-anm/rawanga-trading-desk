@@ -26,6 +26,10 @@ Your data is stored next to the application (`data/`).
 ## Features
 
 - Candlestick charts, timeframes 15m–1M, indicators (MA/EMA/RSI/MACD/ATR/Supertrend and more).
+- **Drawing tools** on the chart: trend lines, rays, channels, shapes, Fibonacci
+  retracement/extension/fan/time zones, text and price labels, plus a measuring
+  ruler (Δ price/%, bars, duration) and an OHLC magnet. Markup is stored per
+  symbol × timeframe in the browser (localStorage), undo/redo included.
 - Data sources with a fallback cascade: BingX → Binance → Bybit → OKX for crypto,
   Yahoo Finance for stocks/commodities.
 - Strategy editor and back-testing engine (Python, sandboxed).
